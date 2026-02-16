@@ -2,6 +2,7 @@
 
 #include <GFX/Scene.hpp>
 #include <GFX/Player.hpp>
+#include <memory>
 #include <raylib.h>
 #include <GFX/CollidableModel.hpp>
 
@@ -21,7 +22,7 @@ private:
     Hotones::Player player;
     Camera camera;
     // Main world model
-    CollidableModel* worldModel = nullptr;
+    std::shared_ptr<CollidableModel> worldModel;
     bool worldDebug = false;
 
     void DrawLevel();

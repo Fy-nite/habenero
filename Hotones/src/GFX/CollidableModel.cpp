@@ -2,6 +2,9 @@
 #include "AssetPath.hpp"
 #include <raylib.h>
 #include <raymath.h>
+#if defined(_WIN32)
+#include <crtdbg.h>
+#endif
 
 namespace Hotones {
 
@@ -11,7 +14,15 @@ CollidableModel::CollidableModel(const std::string& path, Vector3 position)
     std::string resolved = ResolveAssetPath(path);
     const char* loadPath = (!resolved.empty() ? resolved.c_str() : path.c_str());
     TraceLog(LOG_INFO, "CollidableModel: loading model '%s'", loadPath);
-    model = LoadModel(loadPath);
+    // Check file exists before calling into raylib's LoadModel (can crash if file missing/corrupt)
+    FILE *f = fopen(loadPath, "rb");
+    if (!f) {
+        TraceLog(LOG_ERROR, "CollidableModel: model file not found: %s", loadPath);
+        model = {0};
+    } else {
+        fclose(f);
+        model = LoadModel(loadPath);
+    }
     if (model.meshCount <= 0 || model.meshes == NULL) {
         TraceLog(LOG_WARNING, "CollidableModel: loaded model has no meshes or failed to load meshes (meshes=%p, meshCount=%d)", (const void*)model.meshes, model.meshCount);
     }
@@ -23,7 +34,17 @@ CollidableModel::~CollidableModel() {
              (const void*)model.meshes, model.meshCount, (const void*)model.materials, model.materialCount);
     // Only call UnloadModel if there is something to unload or pointers are non-null
     if (model.meshCount > 0 || model.materialCount > 0 || model.meshes != NULL || model.materials != NULL) {
+#if defined(_WIN32)
+        // Check CRT heap for corruption before unload (debug builds)
+        _CrtCheckMemory();
+#endif
         UnloadModel(model);
+#if defined(_WIN32)
+        // Check CRT heap after unload to catch overruns early
+        _CrtCheckMemory();
+#endif
+        // Clear the model struct so dangling pointers are not reused
+        model = {0};
     }
 }
 

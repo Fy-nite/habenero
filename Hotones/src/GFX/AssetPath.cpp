@@ -1,7 +1,9 @@
 #include "AssetPath.hpp"
 #include <string>
+#include <stdio.h>
 
 #ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <vector>
 #else
@@ -60,5 +62,13 @@ std::string ResolveAssetPath(const std::string &assetPath)
     std::string out = exeDir;
     if (out.back() != sep) out.push_back(sep);
     out += assetPath;
+    // Log resolved path and whether file exists
+    FILE *f = fopen(out.c_str(), "rb");
+    if (f) {
+        fprintf(stderr, "ResolveAssetPath: found asset at %s\n", out.c_str());
+        fclose(f);
+    } else {
+        fprintf(stderr, "ResolveAssetPath: asset not found at %s\n", out.c_str());
+    }
     return out;
 }

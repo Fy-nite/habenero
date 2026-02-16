@@ -12,12 +12,22 @@ public:
     SoundBus();
     ~SoundBus();
 
+    void PlaySound(const std::string &soundName);
+
     // Volume in 0-100
     int SetVolume(int newVolume);
     int GetVolume() const;
 
     // Legacy placeholder
-    void PlaySound(const std::string& soundName);
+    // Play a sound by filename (wav/ogg). `soundName` is a filesystem path.
+    bool PlaySound(const std::string& soundPath, float gain = 1.0f);
+
+    // Load a sound file and give it a logical name for later playback.
+    // Returns true on success.
+    bool LoadSoundFile(const std::string& name, const std::string& filePath);
+
+    // Play a previously loaded sound by name.
+    bool PlayLoaded(const std::string& name, float gain = 1.0f);
 
     // Play raw PCM interleaved 16-bit signed samples.
     // `data` is interleaved PCM (frames * channels).

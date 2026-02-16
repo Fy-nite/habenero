@@ -2,6 +2,7 @@
 #include <GFX/CollidableModel.hpp>
 #include <iostream>
 #include <cmath>
+#include <SFX/AudioSystem.hpp>
 
 namespace Hotones {
 
@@ -20,7 +21,7 @@ void Player::AttachCamera(Camera* camera) {
     m_attachedCamera = camera;
 }
 
-void Player::AttachWorld(CollidableModel* world) {
+void Player::AttachWorld(std::shared_ptr<CollidableModel> world) {
     m_worldModel = world;
 }
 
@@ -55,6 +56,15 @@ void Player::Update() {
         walkLerp = Lerp(walkLerp, 0.0f, 10.0f * delta);
         m_attachedCamera->fovy = Lerp(m_attachedCamera->fovy, 60.0f, 5.0f * delta);
     }
+
+    // Footstep trigger: when head bob sine crosses from negative to positive
+    float newHeadSin = sinf(headTimer * PI);
+    if (body.isGrounded && ((forward != 0) || (sideway != 0))) {
+        if (prevHeadSin <= 0.0f && newHeadSin > 0.0f && walkLerp > 0.2f) {
+            Ho_tones::GetSoundBus().PlayLoaded("footstep", 1.0f);
+        }
+    }
+    prevHeadSin = newHeadSin;
 
     lean.x = Lerp(lean.x, (float)sideway * 0.02f, 10.0f * delta);
     lean.y = Lerp(lean.y, (float)forward * 0.015f, 10.0f * delta);

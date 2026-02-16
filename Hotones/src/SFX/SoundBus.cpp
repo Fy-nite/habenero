@@ -1,5 +1,6 @@
 #include <iostream>
 #include <vector>
+#include <unordered_map>
 #include <cmath>
 #include <algorithm>
 #include <cstring>
@@ -19,6 +20,8 @@ namespace Ho_tones {
     // Keep track of raylib-created Sounds and their temp filenames so we can stop/unload them from StopAll().
     static std::vector<Sound> raylibSounds;
     static std::vector<std::string> raylibTempFiles;
+    // Loaded named sounds (from disk assets)
+    static std::unordered_map<std::string, Sound> loadedSounds;
 
     struct SoundBus::Voice {
         std::vector<int16_t> samples; // interleaved
@@ -46,7 +49,43 @@ namespace Ho_tones {
     }
 
     void SoundBus::PlaySound(const std::string& soundName) {
-        std::cout << "Playing sound: " << soundName << std::endl;
+        // Load and play a sound by path
+        if (!IsAudioDeviceReady()) return;
+        Sound s = LoadSound(soundName.c_str());
+        SetSoundVolume(s, 1.0f);
+        ::PlaySound(s);
+        raylibSounds.push_back(s);
+    }
+
+    bool SoundBus::PlaySound(const std::string& soundPath, float gain) {
+        if (!IsAudioDeviceReady()) return false;
+        Sound s = LoadSound(soundPath.c_str());
+        SetSoundVolume(s, gain);
+        ::PlaySound(s);
+        raylibSounds.push_back(s);
+        return true;
+    }
+
+    bool SoundBus::LoadSoundFile(const std::string& name, const std::string& filePath) {
+        if (!IsAudioDeviceReady()) return false;
+        try {
+            Sound s = LoadSound(filePath.c_str());
+            loadedSounds[name] = s;
+            return true;
+        } catch (...) {
+            return false;
+        }
+    }
+
+    bool SoundBus::PlayLoaded(const std::string& name, float gain) {
+        if (!IsAudioDeviceReady()) return false;
+        auto it = loadedSounds.find(name);
+        if (it == loadedSounds.end()) return false;
+        SetSoundVolume(it->second, gain);
+        ::PlaySound(it->second);
+        // Do not push the named loaded Sound into `raylibSounds` —
+        // `loadedSounds` owns it and will be unloaded in StopAll().
+        return true;
     }
 
     void SoundBus::PlayPCM(const std::vector<int16_t>& data, int sampleRate, int channels, float gain) {
@@ -175,12 +214,24 @@ namespace Ho_tones {
         std::lock_guard<std::mutex> lk(voicesMutex);
         voices.clear();
 
-        // Stop and unload any raylib Sounds we created, and remove temp files
-        for (auto &s : raylibSounds) {
-            StopSound(s);
-            UnloadSound(s);
+        bool audioReady = IsAudioDeviceReady();
+
+        // Stop and unload any raylib Sounds we created (temporary sounds)
+        if (audioReady) {
+            for (auto &s : raylibSounds) {
+                StopSound(s);
+                UnloadSound(s);
+            }
         }
         raylibSounds.clear();
+
+        // Unload any named sounds we loaded from disk
+        if (audioReady) {
+            for (auto &kv : loadedSounds) {
+                UnloadSound(kv.second);
+            }
+        }
+        loadedSounds.clear();
 
         for (auto &p : raylibTempFiles) {
             // best-effort remove

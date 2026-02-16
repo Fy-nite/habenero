@@ -5,6 +5,7 @@
     
     #include <raylib.h>
     #include <raymath.h>
+    #include <memory>
     
     namespace Hotones {
         
@@ -37,7 +38,7 @@
     void Update();
     void AttachCamera(Camera* camera);
     // Attach the world model for collision checks
-    void AttachWorld(class CollidableModel* world);
+    void AttachWorld(std::shared_ptr<class CollidableModel> world);
     void Render();
 
     // Enable or disable Source bhop bug
@@ -54,11 +55,13 @@
     float walkLerp;
     float headLerp;
     Vector2 lean;
+    // previous head sine used to trigger footstep events
+    float prevHeadSin = 0.0f;
 
 private:
     Camera* m_attachedCamera;
-    // Pointer to world model for collision resolution
-    class CollidableModel* m_worldModel = nullptr;
+    // Shared pointer to world model for collision resolution
+    std::shared_ptr<class CollidableModel> m_worldModel = nullptr;
 
     void UpdateBody(char side, char forward, bool jumpPressed, bool crouchHold);
     void UpdateCamera();

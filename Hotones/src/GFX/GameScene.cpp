@@ -5,8 +5,7 @@
 namespace Hotones {
 
 GameScene::GameScene()
-    : worldModel(nullptr)
-    , worldDebug(false) // Added worldDebug flag
+    : worldDebug(false) // Added worldDebug flag
 {
     camera = { 0 };
 }
@@ -30,8 +29,8 @@ void GameScene::Init()
 
 
     // Load the main world model (replace path as needed)
-    worldModel = new CollidableModel("assets/world.glb", {0,0,0});
-    // Let player use the world for collisions
+    worldModel = std::make_shared<CollidableModel>("assets/world.glb", (Vector3){0,0,0});
+    // Let player use the world for collisions (shared ownership)
     player.AttachWorld(worldModel);
 }
 
@@ -82,10 +81,8 @@ void GameScene::DrawLevel()
 void GameScene::Unload()
 {
     // No testModel cleanup needed
-
     if (worldModel) {
-        delete worldModel;
-        worldModel = nullptr;
+        worldModel.reset();
     }
 }
 

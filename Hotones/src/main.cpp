@@ -5,6 +5,9 @@
 #include <GFX/LoadingScene.hpp>
 #include <GFX/SimpleScene.hpp>
 #include <GFX/GameScene.hpp>
+#include <SFX/AudioSystem.hpp>
+#include <Assets/AssetLoader.hpp>
+#include <filesystem>
 
 //----------------------------------------------------------------------------------
 // Module Functions Declaration
@@ -21,7 +24,17 @@ int main(void)
     const int screenWidth = 1280;
     const int screenHeight = 768;
 
-    InitWindow(screenWidth, screenHeight, "raylib [core] example - 3d camera fps");
+    InitWindow(screenWidth, screenHeight, "Habanero Hotel - Hotones");
+    // Initialize audio subsystem so game systems can play sounds (footsteps etc.)
+    Ho_tones::InitAudioSystem();
+
+    // Try to find and load a footstep asset using the AssetLoader
+    {
+        std::string found;
+        if (Ho_tones::Assets::FindAsset("Assets/footstep.wav", found) || Ho_tones::Assets::FindAsset("Assets/footstep.ogg", found)) {
+            Ho_tones::GetSoundBus().LoadSoundFile("footstep", found);
+        }
+    }
 
     // Initialize player and camera
     Hotones::Player player;
@@ -75,6 +88,9 @@ int main(void)
 
     // De-Initialization
     //--------------------------------------------------------------------------------------
+    // Shutdown audio before closing the window
+    Ho_tones::ShutdownAudioSystem();
+
     CloseWindow();        // Close window and OpenGL context
     //--------------------------------------------------------------------------------------
 
