@@ -32,8 +32,8 @@ public:
     bool IsDebug() const { return debug; }
 
 private:
-    Model model;
-    Vector3 position;
+    Model model = {0};
+    Vector3 position = {0,0,0};
     BoundingBox bbox;
     void UpdateBoundingBox();
 

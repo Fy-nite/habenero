@@ -9,14 +9,22 @@ CollidableModel::CollidableModel(const std::string& path, Vector3 position)
     : position(position)
 {
     std::string resolved = ResolveAssetPath(path);
-    // If resolve returns empty or same as input, fall back to provided path
     const char* loadPath = (!resolved.empty() ? resolved.c_str() : path.c_str());
+    TraceLog(LOG_INFO, "CollidableModel: loading model '%s'", loadPath);
     model = LoadModel(loadPath);
+    if (model.meshCount <= 0 || model.meshes == NULL) {
+        TraceLog(LOG_WARNING, "CollidableModel: loaded model has no meshes or failed to load meshes (meshes=%p, meshCount=%d)", (const void*)model.meshes, model.meshCount);
+    }
     UpdateBoundingBox();
 }
 
 CollidableModel::~CollidableModel() {
-    UnloadModel(model);
+    TraceLog(LOG_INFO, "CollidableModel: unloading model (meshes=%p, meshCount=%d, materials=%p, materialCount=%d)",
+             (const void*)model.meshes, model.meshCount, (const void*)model.materials, model.materialCount);
+    // Only call UnloadModel if there is something to unload or pointers are non-null
+    if (model.meshCount > 0 || model.materialCount > 0 || model.meshes != NULL || model.materials != NULL) {
+        UnloadModel(model);
+    }
 }
 
 void CollidableModel::Draw() {
@@ -56,7 +64,7 @@ static Vector3 ClampPointToBox(const Vector3 &p, const BoundingBox &b) {
 
 bool CollidableModel::ResolveSphereCollision(Vector3 &center, float radius) {
     bool collided = false;
-    if (model.meshCount <= 0) return false;
+    if (model.meshCount <= 0 || model.meshes == NULL) return false;
 
     for (int i = 0; i < model.meshCount; i++) {
         BoundingBox mb = GetMeshBoundingBox(model.meshes[i]);
@@ -135,6 +143,14 @@ bool Hotones::CollidableModel::SweepSphere(const Vector3 &start, const Vector3 &
     BoundingBox bestBox;
     int bestAxis = 0;
 
+    if (model.meshCount <= 0 || model.meshes == NULL) {
+        lastSweepHit = false;
+        lastSweepStart = start;
+        lastSweepEnd = end;
+        lastSweepT = 0.0f;
+        return false;
+    }
+
     for (int i = 0; i < model.meshCount; i++) {
         BoundingBox mb = GetMeshBoundingBox(model.meshes[i]);
         // offset by model position
@@ -204,13 +220,15 @@ bool Hotones::CollidableModel::SweepSphere(const Vector3 &start, const Vector3 &
 
 void Hotones::CollidableModel::DrawDebug() const {
     // draw per-mesh AABBs
-    for (int i = 0; i < model.meshCount; ++i) {
-        BoundingBox mb = GetMeshBoundingBox(model.meshes[i]);
-        mb.min = Vector3Add(mb.min, position);
-        mb.max = Vector3Add(mb.max, position);
-        DrawBoundingBox(mb, Fade(YELLOW, 0.5f));
-        DrawCubeWires((Vector3){ (mb.min.x+mb.max.x)/2.0f, (mb.min.y+mb.max.y)/2.0f, (mb.min.z+mb.max.z)/2.0f },
-                  mb.max.x - mb.min.x, mb.max.y - mb.min.y, mb.max.z - mb.min.z, ORANGE);
+    if (model.meshCount > 0 && model.meshes != NULL) {
+        for (int i = 0; i < model.meshCount; ++i) {
+            BoundingBox mb = GetMeshBoundingBox(model.meshes[i]);
+            mb.min = Vector3Add(mb.min, position);
+            mb.max = Vector3Add(mb.max, position);
+            DrawBoundingBox(mb, Fade(YELLOW, 0.5f));
+            DrawCubeWires((Vector3){ (mb.min.x+mb.max.x)/2.0f, (mb.min.y+mb.max.y)/2.0f, (mb.min.z+mb.max.z)/2.0f },
+                          mb.max.x - mb.min.x, mb.max.y - mb.min.y, mb.max.z - mb.min.z, ORANGE);
+        }
     }
 
     if (lastSweepHit) {
@@ -227,7 +245,7 @@ void Hotones::CollidableModel::DrawDebug() const {
 
 void CollidableModel::UpdateBoundingBox() {
     // Compute union of all mesh bounding boxes and offset by model position
-    if (model.meshCount > 0) {
+    if (model.meshCount > 0 && model.meshes != NULL) {
         BoundingBox accum = GetMeshBoundingBox(model.meshes[0]);
         for (int i = 1; i < model.meshCount; ++i) {
             BoundingBox mb = GetMeshBoundingBox(model.meshes[i]);
@@ -244,6 +262,11 @@ void CollidableModel::UpdateBoundingBox() {
         accum.min = Vector3Add(accum.min, offset);
         accum.max = Vector3Add(accum.max, offset);
         bbox = accum;
+    }
+    else {
+        // Fallback: empty bounding box at model position
+        bbox.min = position;
+        bbox.max = position;
     }
 }
 

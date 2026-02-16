@@ -22,10 +22,10 @@ build:
   futDefines: []
   futIncludes: []
   futReadOnly: []
-  futExtraArgs: []
+  futExtraArgs: []/
   extraArgs:
   - ' -Isrc/include -lraylib'
-  - '-fsanitize=address -g'
+  # - '-fsanitize=address -g'
   jobs: 12
 dependencies: {}
 dependencyCategories: {}
