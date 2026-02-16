@@ -30,7 +30,7 @@ void GameScene::Init()
 
 
     // Load the main world model (replace path as needed)
-    worldModel = new CollidableModel("assets/world.gltf", {0,0,0});
+    worldModel = new CollidableModel("assets/world.glb", {0,0,0});
     // Let player use the world for collisions
     player.AttachWorld(worldModel);
 }
