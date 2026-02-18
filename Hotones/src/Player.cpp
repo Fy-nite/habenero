@@ -80,23 +80,23 @@ void Player::UpdateBody(char side, char forward, bool jumpPressed, bool crouchHo
     if (!body.isGrounded) body.velocity.y -= GRAVITY * delta;
 
     static bool wasJumpHeld = false;
-    if (enableSourceBhop) {
-        // Source bhop bug: allow holding jump to jump on landing
+    // if (enableSourceBhop) {
+    //     // Source bhop bug: allow holding jump to jump on landing
+    //     if (body.isGrounded && jumpPressed) {
+    //         body.velocity.y = JUMP_FORCE;
+    //         body.isGrounded = false;
+    //     } else if (body.isGrounded && wasJumpHeld && IsKeyDown(KEY_SPACE)) {
+    //         // If jump is still held from previous frame, auto-jump
+    //         body.velocity.y = JUMP_FORCE;
+    //         body.isGrounded = false;
+    //     }
+    //     wasJumpHeld = IsKeyDown(KEY_SPACE);
+    // } else {
         if (body.isGrounded && jumpPressed) {
             body.velocity.y = JUMP_FORCE;
             body.isGrounded = false;
-        } else if (body.isGrounded && wasJumpHeld && IsKeyDown(KEY_SPACE)) {
-            // If jump is still held from previous frame, auto-jump
-            body.velocity.y = JUMP_FORCE;
-            body.isGrounded = false;
         }
-        wasJumpHeld = IsKeyDown(KEY_SPACE);
-    } else {
-        if (body.isGrounded && jumpPressed) {
-            body.velocity.y = JUMP_FORCE;
-            body.isGrounded = false;
-        }
-    }
+    // }
 
     Vector3 front = (Vector3){ sinf(lookRotation.x), 0.f, cosf(lookRotation.x) };
     Vector3 right = (Vector3){ cosf(-lookRotation.x), 0.f, sinf(-lookRotation.x) };
@@ -132,19 +132,30 @@ void Player::UpdateBody(char side, char forward, bool jumpPressed, bool crouchHo
     if (m_worldModel) {
         const int maxIters = 3;
         Vector3 curr = startPos;
-        for (int iter = 0; iter < maxIters; ++iter) {
-            Vector3 target = Vector3Add(curr, remaining);
+
+        // Subdivide the total remaining travel into smaller steps to avoid tunneling
+        float remLen = Vector3Length(remaining);
+        float stepMax = fmaxf(playerRadius * 0.5f, 0.25f); // maximum allowed step length
+        int steps = (int)ceilf(remLen / stepMax);
+        steps = fmax(1, steps);
+        // clamp to avoid excessive loops
+        steps = (steps > 16) ? 16 : steps;
+
+        Vector3 stepVec = Vector3Scale(remaining, 1.0f / (float)steps);
+
+        for (int s = 0; s < steps; ++s) {
+            Vector3 target = Vector3Add(curr, stepVec);
             Vector3 hitPos, hitNormal; float tHit;
             if (!m_worldModel->SweepSphere(curr, target, playerRadius, hitPos, hitNormal, tHit)) {
-                // no hit: move to target and finish
+                // no hit: move to target and continue
                 curr = target;
-                break;
+                continue;
             }
 
             // move to impact point
             curr = hitPos;
 
-            // compute remaining after impact
+            // compute remaining after impact within this step
             Vector3 travel = Vector3Subtract(target, hitPos);
             float vn = Vector3DotProduct(travel, hitNormal);
             Vector3 proj = Vector3Scale(hitNormal, vn);
@@ -153,21 +164,55 @@ void Player::UpdateBody(char side, char forward, bool jumpPressed, bool crouchHo
             // small epsilon to avoid sticking
             curr = Vector3Add(curr, Vector3Scale(hitNormal, 0.001f));
 
-            // set remaining for next iteration
-            remaining = slide;
+            // apply slide as the remaining motion for the rest of this update
+            remaining = Vector3Add(Vector3Scale(stepVec, (float)(steps - s - 1)), slide);
 
             // If hit normal is mostly up, consider grounded and zero vertical velocity
             if (hitNormal.y > 0.5f) {
                 body.isGrounded = true;
                 body.velocity.y = 0.0f;
             }
+
+            // attempt a few iterations of sliding resolution
+            // similar to previous loop but limited
+            for (int iter = 0; iter < maxIters; ++iter) {
+                Vector3 nextTarget = Vector3Add(curr, remaining);
+                if (!m_worldModel->SweepSphere(curr, nextTarget, playerRadius, hitPos, hitNormal, tHit)) {
+                    curr = nextTarget;
+                    break;
+                }
+                curr = hitPos;
+                travel = Vector3Subtract(nextTarget, hitPos);
+                vn = Vector3DotProduct(travel, hitNormal);
+                proj = Vector3Scale(hitNormal, vn);
+                slide = Vector3Subtract(travel, proj);
+                curr = Vector3Add(curr, Vector3Scale(hitNormal, 0.001f));
+                remaining = slide;
+                if (hitNormal.y > 0.5f) {
+                    body.isGrounded = true;
+                    body.velocity.y = 0.0f;
+                    break;
+                }
+            }
+            // after resolving this impact, continue from current position with updated remaining
         }
 
-        body.position = Vector3Add(startPos, Vector3Subtract(startPos, startPos)); // keep structure
-        // final position is startPos + consumed motion: compute from curr
+        // final position is the swept result `curr`
         body.position = curr;
         // update velocity to match actual movement
         body.velocity = Vector3Scale(Vector3Subtract(body.position, startPos), 1.0f / delta);
+
+        // Ensure we are not left overlapping geometry due to numeric issues by
+        // resolving any residual sphere collisions against the world meshes.
+        // This pushes the player out of intersecting AABBs and marks grounded
+        // when appropriate to avoid walking through thin or missed collisions.
+        bool pushed = m_worldModel->ResolveSphereCollision(body.position, playerRadius);
+        if (pushed) {
+            // If ResolveSphereCollision pushed us upwards, consider grounded.
+            // Conservative: zero vertical velocity to avoid tunneling.
+            body.velocity.y = 0.0f;
+            body.isGrounded = true;
+        }
     } else {
         // no world: simple move
         body.position.x += remaining.x;

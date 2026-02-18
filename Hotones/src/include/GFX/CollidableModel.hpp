@@ -36,6 +36,8 @@ private:
     Vector3 position = {0,0,0};
     BoundingBox bbox;
     void UpdateBoundingBox();
+    // Handle returned by the physics system when registering this model's static mesh
+    int physicsHandle = -1;
 
     // Debug state for last sweep
     bool debug = false;

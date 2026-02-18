@@ -1,10 +1,4 @@
-# if -compile is provided, use it.
-if [[ "${1:-}" == "-compile" ]]; then
-    shift
-    g++ -std=c++20 $(find src -name "*.cpp" -print | tr '\n' ' ') -Isrc/include -DWINDOWS_UCRT64 -lraylib -llua -o build/Hotones
-    exit 0
-fi
-
+#!/usr/bin/env bash
 set -euo pipefail
 
 libs=(
@@ -31,10 +25,3 @@ fi
 
 mkdir -p build/assets
 cp -r -f ../assets/. build/assets/
-# if meow is not on path, use the local copy and if -- compile wasn't provided, use meow to build the project.
-if ! command -v meow &> /dev/null; then
-    echo "meow could not be found, using local copy"
-    ../../meow/publish/win-x64/meow build
-else
-    meow build
-fi

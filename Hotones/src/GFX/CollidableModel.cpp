@@ -6,6 +6,7 @@
 #if defined(_WIN32)
 #include <crtdbg.h>
 #endif
+#include <Physics/PhysicsSystem.hpp>
 
 namespace Hotones {
 
@@ -27,22 +28,22 @@ CollidableModel::CollidableModel(const std::string& path, Vector3 position)
             std::filesystem::path p(loadPath);
             std::string ext = p.extension().string();
             for (auto &c : ext) c = (char)tolower(c);
-            if (ext == ".bsp") {
-                auto models = LoadModelsFromBSPFile(p);
-                if (!models.empty()) {
-                    // Use the first generated model and unload any extras
-                    model = std::move(models[0]);
-                    for (size_t i = 1; i < models.size(); ++i) {
-                        UnloadModel(models[i]);
-                    }
-                } else {
-                    TraceLog(LOG_ERROR, "CollidableModel: failed to import BSP: %s", loadPath);
-                    model = {0};
-                }
-            } else {
-                model = LoadModel(loadPath);
+            // if (ext == ".bsp") {
+            //     auto models = LoadModelsFromBSPFile(p);
+            //     if (!models.empty()) {
+            //         // Use the first generated model and unload any extras
+            //         model = std::move(models[0]);
+            //         for (size_t i = 1; i < models.size(); ++i) {
+            //             UnloadModel(models[i]);
+            //         }
+            //     } else {
+            //         TraceLog(LOG_ERROR, "CollidableModel: failed to import BSP: %s", loadPath);
+            //         model = {0};
+            //     }
+            // } else {
+            model = LoadModel(loadPath);
             
-            }
+            
         } catch (const std::exception &e) {
             TraceLog(LOG_ERROR, "CollidableModel: exception while loading model: %s: %s", loadPath, e.what());
             model = {0};
@@ -55,6 +56,10 @@ CollidableModel::CollidableModel(const std::string& path, Vector3 position)
         TraceLog(LOG_WARNING, "CollidableModel: loaded model has no meshes or failed to load meshes (meshes=%p, meshCount=%d)", (const void*)model.meshes, model.meshCount);
     }
     UpdateBoundingBox();
+
+    // Register this model's geometry with the physics system (best-effort).
+    physicsHandle = -1;
+    physicsHandle = Hotones::Physics::RegisterStaticMeshFromModel(model, position);
 }
 
 CollidableModel::~CollidableModel() {
@@ -73,6 +78,11 @@ CollidableModel::~CollidableModel() {
 #endif
         // Clear the model struct so dangling pointers are not reused
         model = {0};
+    }
+    // Unregister from physics system if needed
+    if (physicsHandle != -1) {
+        Hotones::Physics::UnregisterStaticMesh(physicsHandle);
+        physicsHandle = -1;
     }
 }
 
