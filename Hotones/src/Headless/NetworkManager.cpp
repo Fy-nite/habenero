@@ -9,6 +9,7 @@
   #endif
   #include <winsock2.h>
   #include <ws2tcpip.h>
+  #include <mswsock.h>   // SIO_UDP_CONNRESET
   using SocketHandle = SOCKET;
   static constexpr SocketHandle INVALID_SOCK_VAL = INVALID_SOCKET;
   using SockLen = int;
@@ -29,6 +30,7 @@
 #include <server/NetworkManager.hpp>
 
 #include <atomic>
+#include <chrono>
 #include <cstring>
 #include <iostream>
 #include <mutex>
@@ -80,6 +82,12 @@ struct NetworkManager::Impl {
     // Remote player snapshots
     std::unordered_map<uint8_t, RemotePlayer> remotePlayers;
 
+    // Connection retry (client mode)
+    std::chrono::steady_clock::time_point lastConnectAttempt {};
+    int connectAttempts = 0;
+    static constexpr int    MAX_CONNECT_ATTEMPTS  = 15;
+    static constexpr int    CONNECT_RETRY_MS      = 500;
+
     // ── Socket helpers ────────────────────────────────────────────────────────
     bool InitSocket(uint16_t bindPort) {
         socket = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -90,6 +98,21 @@ struct NetworkManager::Impl {
         int opt = 1;
         setsockopt(socket, SOL_SOCKET, SO_REUSEADDR,
                    reinterpret_cast<const char*>(&opt), sizeof(opt));
+
+#ifdef _WIN32
+        // Disable ICMP Port Unreachable from causing recvfrom to return WSAECONNRESET.
+        // Without this, any UDP packet that hits a closed port on the remote machine
+        // causes the NEXT recvfrom on THIS socket to return -1, silently consuming
+        // a real incoming packet (e.g. ConnectAckPacket). Hits cross-machine only;
+        // loopback suppresses ICMP errors, which is why localhost appeared to work.
+        {
+            DWORD dwBytes  = 0;
+            BOOL  bDisable = FALSE;
+            WSAIoctl(socket, SIO_UDP_CONNRESET,
+                     &bDisable, sizeof(bDisable),
+                     nullptr, 0, &dwBytes, nullptr, nullptr);
+        }
+#endif
 
         sockaddr_in addr{};
         addr.sin_family      = AF_INET;
@@ -131,6 +154,26 @@ struct NetworkManager::Impl {
     void RecvLoop() {
         uint8_t buf[512];
         while (running.load()) {
+            // Client: resend ConnectPacket every CONNECT_RETRY_MS until acknowledged.
+            if (mode == NetworkManager::Mode::Client && !connected
+                    && connectAttempts < MAX_CONNECT_ATTEMPTS) {
+                auto now = std::chrono::steady_clock::now();
+                auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                    now - lastConnectAttempt).count();
+                if (elapsed >= CONNECT_RETRY_MS) {
+                    ConnectPacket pkt{};
+                    pkt.header.type     = PacketType::CONNECT;
+                    pkt.header.playerId = 0;
+                    std::strncpy(pkt.name, localName, 15);
+                    pkt.name[15] = '\0';
+                    SendRaw(serverAddr, &pkt, sizeof(pkt));
+                    lastConnectAttempt = now;
+                    ++connectAttempts;
+                    std::cout << "[Net] ConnectPacket attempt "
+                              << connectAttempts << "/" << MAX_CONNECT_ATTEMPTS << "\n";
+                }
+            }
+
             sockaddr_in from{};
             SockLen fromLen = sizeof(from);
             int n = recvfrom(socket,
@@ -358,13 +401,24 @@ bool NetworkManager::Connect(const std::string& host, uint16_t port,
     if (m_impl->running.load()) return false;
     if (!m_impl->InitSocket(0)) return false;  // ephemeral local port
 
-    std::memset(&m_impl->serverAddr, 0, sizeof(m_impl->serverAddr));
-    m_impl->serverAddr.sin_family = AF_INET;
-    m_impl->serverAddr.sin_port   = htons(port);
-    if (inet_pton(AF_INET, host.c_str(), &m_impl->serverAddr.sin_addr) != 1) {
-        std::cerr << "[Net] Invalid server address: " << host << "\n";
-        m_impl->CloseSocket();
-        return false;
+    // Resolve host — handles both IP strings ("192.168.1.5") and hostnames ("myserver").
+    // inet_pton only handles IP strings, which is why cross-machine hostname connects failed.
+    {
+        addrinfo hints{};
+        hints.ai_family   = AF_INET;
+        hints.ai_socktype = SOCK_DGRAM;
+        hints.ai_protocol = IPPROTO_UDP;
+        addrinfo* res     = nullptr;
+        std::string portStr = std::to_string(port);
+        int err = getaddrinfo(host.c_str(), portStr.c_str(), &hints, &res);
+        if (err != 0 || !res) {
+            std::cerr << "[Net] Cannot resolve host '" << host << "': "
+                      << gai_strerror(err) << "\n";
+            m_impl->CloseSocket();
+            return false;
+        }
+        std::memcpy(&m_impl->serverAddr, res->ai_addr, sizeof(sockaddr_in));
+        freeaddrinfo(res);
     }
     std::strncpy(m_impl->localName, playerName.c_str(), 15);
     m_impl->localName[15] = '\0';
@@ -373,11 +427,15 @@ bool NetworkManager::Connect(const std::string& host, uint16_t port,
     m_impl->running = true;
     m_impl->recvThread = std::thread([this]{ m_impl->RecvLoop(); });
 
+    // Send the initial ConnectPacket; RecvLoop will retry every 500ms until ACKed.
     ConnectPacket pkt{};
     pkt.header.type     = PacketType::CONNECT;
     pkt.header.playerId = 0;
     std::strncpy(pkt.name, m_impl->localName, 15);
+    pkt.name[15] = '\0';
     m_impl->SendRaw(m_impl->serverAddr, &pkt, sizeof(pkt));
+    m_impl->lastConnectAttempt = std::chrono::steady_clock::now();
+    m_impl->connectAttempts    = 1;
 
     std::cout << "[Net] Connecting to " << host << ":" << port
               << " as \"" << m_impl->localName << "\"...\n";
@@ -392,9 +450,10 @@ void NetworkManager::Disconnect() {
         pkt.header.playerId = m_impl->localId;
         m_impl->SendRaw(m_impl->serverAddr, &pkt, sizeof(pkt));
     }
-    m_impl->running   = false;
-    m_impl->connected = false;
-    m_impl->localId   = 0;
+    m_impl->running          = false;
+    m_impl->connected        = false;
+    m_impl->localId          = 0;
+    m_impl->connectAttempts  = 0;
     if (m_impl->recvThread.joinable()) m_impl->recvThread.join();
     m_impl->CloseSocket();
     m_impl->remotePlayers.clear();
