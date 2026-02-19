@@ -12,12 +12,12 @@ Scripts are loaded from ''init.lua'' at the root of the pack directory.  The eng
 
 ===== Libraries =====
 
-  * [[lua_api:audio|audio]] — Sound loading and playback.
-  * [[lua_api:input|input]] — Keyboard, mouse, and constants.
-  * [[lua_api:mesh|mesh]] — 3-D primitive drawing (call from ''draw3D'').
-  * [[lua_api:render|render]] — 2-D / HUD drawing (call from ''Draw'').
-  * [[lua_api:server|server]] — Logging, time, and headless-server utilities.
-  * [[lua_api:globals|globals]] — Top-level global functions (''GetFrameTime'', ''GetTime'').
+  * [[projects:habenero:lua:audio|audio]] — Sound loading and playback.
+  * [[projects:habenero:lua:input|input]] — Keyboard, mouse, and constants.
+  * [[projects:habenero:lua:mesh|mesh]] — 3-D primitive drawing (call from ''draw3D'').
+  * [[projects:habenero:lua:render|render]] — 2-D / HUD drawing (call from ''Draw'').
+  * [[projects:habenero:lua:server|server]] — Logging, time, and headless-server utilities.
+  * [[projects:habenero:lua:globals|globals]] — Top-level global functions (''GetFrameTime'', ''GetTime'').
 
 ===== Minimal Pack Layout =====
 

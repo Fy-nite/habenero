@@ -1,6 +1,6 @@
 ﻿-- DemoCupProject/init.lua
--- Reference / demo pack for the Hotones engine.
--- Run with:  Hotones --pak DemoCupProject/
+-- Reference / demo pack for the HoTones engine.
+-- Run with:  HoTones --pak DemoCupProject/
 -- See docs/cupformat.md for the full spec.
 
 ------------------------------------------------------------------------
