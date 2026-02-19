@@ -181,6 +181,12 @@ void Hotones::CollidableModel::DrawMeshBoundingBoxes(Color color) const {
     }
 }
 
+void CollidableModel::SetShader(Shader shader)
+{
+    for (int i = 0; i < model.materialCount; i++)
+        model.materials[i].shader = shader;
+}
+
 void CollidableModel::UpdateBoundingBox() {
     // Compute union of all mesh bounding boxes and offset by model position
     if (model.meshCount > 0 && model.meshes != NULL) {

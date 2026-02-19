@@ -11,6 +11,7 @@
 #include "../include/Scripting/LuaLoader/Input.hpp"
 #include "../include/Scripting/LuaLoader/ServerLib.hpp"
 #include "../include/Scripting/LuaLoader/MeshGen.hpp"
+#include "../include/Scripting/LuaLoader/Lighting.hpp"
 
 #include <lua.hpp>
 
@@ -48,11 +49,35 @@ namespace {
     }
 } // anonymous namespace
 
+// Internal reload request flag (global for the single CupLoader instance).
+static std::atomic<bool> g_reloadRequested { false };
+
+// Lua binding: reload the currently-loaded pack. Upvalue 1 = CupLoader* (lightuserdata)
+static int l_reload(lua_State* L)
+{
+    void* p = lua_touserdata(L, lua_upvalueindex(1));
+    if (!p) {
+        lua_pushboolean(L, 0);
+        return 1;
+    }
+    Hotones::Scripting::CupLoader* loader = static_cast<Hotones::Scripting::CupLoader*>(p);
+    // Defer actual reload to avoid closing the active Lua state while this
+    // C function is still executing.  Mark a request and return true.
+    g_reloadRequested.store(true);
+    lua_pushboolean(L, 1);
+    return 1;
+}
+
 namespace Hotones::Scripting {
 
 CupLoader::CupLoader()
     : L(nullptr), m_classRef(LUA_NOREF)
 {
+}
+
+void CupLoader::requestReload()
+{
+    g_reloadRequested.store(true);
 }
 
 CupLoader::~CupLoader()
@@ -75,6 +100,7 @@ bool CupLoader::init()
     Hotones::Scripting::LuaLoader::registerInput(L);
     Hotones::Scripting::LuaLoader::registerServer(L);
     Hotones::Scripting::LuaLoader::registerMeshGen(L);
+    Hotones::Scripting::LuaLoader::registerLighting(L);
 
     // Register timing globals so Lua scripts work in both headless and windowed modes
     g_luaTimingInit = false; // reset on each new Lua state
@@ -82,6 +108,12 @@ bool CupLoader::init()
     lua_setglobal(L, "GetFrameTime");
     lua_pushcfunction(L, l_GetTime);
     lua_setglobal(L, "GetTime");
+
+    // Expose reloadPack() to Lua so scripts can request reloading the current pack.
+    // The closure carries a lightuserdata upvalue pointing to this CupLoader instance.
+    lua_pushlightuserdata(L, this);
+    lua_pushcclosure(L, l_reload, 1);
+    lua_setglobal(L, "reloadPack");
 
     return true;
 }
@@ -96,7 +128,9 @@ bool CupLoader::loadScript(const std::string& path)
     int status = luaL_loadfile(L, path.c_str());
     if (status != LUA_OK) {
         const char* msg = lua_tostring(L, -1);
-        TraceLog(LOG_ERROR, "[CupLoader] Load error: %s", (msg ? msg : "<unknown>"));
+        std::string err = msg ? msg : "<unknown>";
+        TraceLog(LOG_ERROR, "[CupLoader] Load error: %s", err.c_str());
+        m_lastLuaError = err;
         lua_pop(L, 1);
         return false;
     }
@@ -109,7 +143,9 @@ bool CupLoader::run()
     int status = lua_pcall(L, 0, LUA_MULTRET, 0);
     if (status != LUA_OK) {
         const char* msg = lua_tostring(L, -1);
-        TraceLog(LOG_ERROR, "[CupLoader] Runtime error: %s", (msg ? msg : "<unknown>"));
+        std::string err = msg ? msg : "<unknown>";
+        TraceLog(LOG_ERROR, "[CupLoader] Runtime error: %s", err.c_str());
+        m_lastLuaError = err;
         lua_pop(L, 1);
         return false;
     }
@@ -134,6 +170,10 @@ bool CupLoader::loadPak(CupPackage& pkg)
     }
     if (!loadScript(initPath) || !run())
         return false;
+
+    // Remember package root and init path so we can reload later
+    m_initPath = initPath;
+    m_packageRoot = pkg.rootPath();
 
     lua_getglobal(L, "Init");
     if (!lua_istable(L, -1)) {
@@ -167,7 +207,120 @@ bool CupLoader::loadPak(CupPackage& pkg)
     return true;
 }
 
-void CupLoader::update()  { callMethod("Update");  }
+bool CupLoader::reload()
+{
+    if (m_initPath.empty()) {
+        TraceLog(LOG_ERROR, "[CupLoader] reload(): no package loaded previously");
+        return false;
+    }
+
+    // Create a fresh Lua state and fully initialise it.  We build the new
+    // state first so that failures leave the existing state untouched.
+    lua_State* newL = luaL_newstate();
+    if (!newL) {
+        TraceLog(LOG_ERROR, "[CupLoader] reload(): failed to create new Lua state");
+        return false;
+    }
+    luaL_openlibs(newL);
+
+    // Register engine libraries into the new state
+    Hotones::Scripting::LuaLoader::registerRendering(newL);
+    Hotones::Scripting::LuaLoader::registerAudio(newL);
+    Hotones::Scripting::LuaLoader::registerInput(newL);
+    Hotones::Scripting::LuaLoader::registerServer(newL);
+    Hotones::Scripting::LuaLoader::registerMeshGen(newL);
+    Hotones::Scripting::LuaLoader::registerLighting(newL);
+
+    // Timing globals
+    g_luaTimingInit = false;
+    lua_pushcfunction(newL, l_GetFrameTime);
+    lua_setglobal(newL, "GetFrameTime");
+    lua_pushcfunction(newL, l_GetTime);
+    lua_setglobal(newL, "GetTime");
+
+    // reloadPack closure in the new state (upvalue = this)
+    lua_pushlightuserdata(newL, this);
+    lua_pushcclosure(newL, l_reload, 1);
+    lua_setglobal(newL, "reloadPack");
+
+    // Load and run init.lua inside the new state
+    int status = luaL_loadfile(newL, m_initPath.c_str());
+    if (status != LUA_OK) {
+        const char* msg = lua_tostring(newL, -1);
+        std::string err = msg ? msg : "<unknown>";
+        TraceLog(LOG_ERROR, "[CupLoader] reload(): load error: %s", err.c_str());
+        m_lastLuaError = err;
+        lua_pop(newL, 1);
+        lua_close(newL);
+        return false;
+    }
+    status = lua_pcall(newL, 0, LUA_MULTRET, 0);
+    if (status != LUA_OK) {
+        const char* msg = lua_tostring(newL, -1);
+        std::string err = msg ? msg : "<unknown>";
+        TraceLog(LOG_ERROR, "[CupLoader] reload(): runtime error: %s", err.c_str());
+        m_lastLuaError = err;
+        lua_pop(newL, 1);
+        lua_close(newL);
+        return false;
+    }
+
+    // Validate and read Init table
+    lua_getglobal(newL, "Init");
+    if (!lua_istable(newL, -1)) {
+        TraceLog(LOG_ERROR, "[CupLoader] reload(): init.lua did not set Init table");
+        lua_pop(newL, 1);
+        lua_close(newL);
+        return false;
+    }
+
+    std::string newMainScene;
+    lua_getfield(newL, -1, "MainScene");
+    if (lua_isstring(newL, -1)) {
+        const char* rel = lua_tostring(newL, -1);
+        newMainScene = (std::filesystem::path(m_packageRoot) / rel).string();
+    }
+    lua_pop(newL, 1);
+
+    int newClassRef = LUA_NOREF;
+    lua_getfield(newL, -1, "MainClass");
+    if (lua_istable(newL, -1)) {
+        newClassRef = luaL_ref(newL, LUA_REGISTRYINDEX);
+    } else {
+        lua_pop(newL, 1);
+        TraceLog(LOG_WARNING, "[CupLoader] reload(): Init.MainClass is not a table.");
+    }
+    lua_pop(newL, 1); // pop Init table
+
+    // Swap in the new state (close old state after extracting anything we need)
+    if (L) {
+        if (m_classRef != LUA_NOREF)
+            luaL_unref(L, LUA_REGISTRYINDEX, m_classRef);
+        lua_close(L);
+    }
+    L = newL;
+    m_classRef = newClassRef;
+    if (!newMainScene.empty()) m_mainScene = newMainScene;
+
+    // Call Init() on the new MainClass (if one existed)
+    if (m_classRef != LUA_NOREF) callMethod("Init");
+
+    TraceLog(LOG_INFO, "[CupLoader] reload(): successfully reloaded %s", m_initPath.c_str());
+    return true;
+}
+
+void CupLoader::update()
+{
+    // Call the scripted Update() first.  If the script requested a reload
+    // via reloadPack(), perform the reload AFTER the call returns to avoid
+    // closing the active Lua state while a C function is on the stack.
+    callMethod("Update");
+    if (g_reloadRequested.exchange(false)) {
+        // perform the actual reload now
+        reload();
+    }
+}
+
 void CupLoader::draw3D()  { callMethod("draw3D");  }
 void CupLoader::draw()    { callMethod("Draw");    }
 
@@ -217,7 +370,9 @@ bool CupLoader::callMethod(const char* method, int /*nargs*/)
     lua_pushvalue(L, -2);
     if (lua_pcall(L, 1, 0, 0) != LUA_OK) {
         const char* err = lua_tostring(L, -1);
-        TraceLog(LOG_ERROR, "[CupLoader] %s() error: %s", method, (err ? err : "<unknown>"));
+        std::string serr = err ? err : "<unknown>";
+        TraceLog(LOG_ERROR, "[CupLoader] %s() error: %s", method, serr.c_str());
+        m_lastLuaError = serr;
         lua_pop(L, 2);
         return false;
     }

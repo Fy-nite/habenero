@@ -41,6 +41,11 @@
   },
   {
     "directory": "D:/HabeneroHotel/Hotones",
+    "command": "g\u002B\u002B -c -g -O0 \u0022D:/HabeneroHotel/Hotones/src/GFX/LightingSystem.cpp\u0022 -o \u0022D:/HabeneroHotel/Hotones/obj/GFX_LightingSystem.cpp.o\u0022 -lraylib -llua -lassimp -lws2_32 -I\u0022src/include\u0022 --std=c\u002B\u002B20",
+    "file": "D:/HabeneroHotel/Hotones/src/GFX/LightingSystem.cpp"
+  },
+  {
+    "directory": "D:/HabeneroHotel/Hotones",
     "command": "g\u002B\u002B -c -g -O0 \u0022D:/HabeneroHotel/Hotones/src/GFX/LoadingScene.cpp\u0022 -o \u0022D:/HabeneroHotel/Hotones/obj/GFX_LoadingScene.cpp.o\u0022 -lraylib -llua -lassimp -lws2_32 -I\u0022src/include\u0022 --std=c\u002B\u002B20",
     "file": "D:/HabeneroHotel/Hotones/src/GFX/LoadingScene.cpp"
   },
@@ -168,6 +173,11 @@
     "directory": "D:/HabeneroHotel/Hotones",
     "command": "g\u002B\u002B -c -g -O0 \u0022D:/HabeneroHotel/Hotones/src/Scripting/LuaLibraries/Input.cpp\u0022 -o \u0022D:/HabeneroHotel/Hotones/obj/Scripting_LuaLibraries_Input.cpp.o\u0022 -lraylib -llua -lassimp -lws2_32 -I\u0022src/include\u0022 --std=c\u002B\u002B20",
     "file": "D:/HabeneroHotel/Hotones/src/Scripting/LuaLibraries/Input.cpp"
+  },
+  {
+    "directory": "D:/HabeneroHotel/Hotones",
+    "command": "g\u002B\u002B -c -g -O0 \u0022D:/HabeneroHotel/Hotones/src/Scripting/LuaLibraries/Lighting.cpp\u0022 -o \u0022D:/HabeneroHotel/Hotones/obj/Scripting_LuaLibraries_Lighting.cpp.o\u0022 -lraylib -llua -lassimp -lws2_32 -I\u0022src/include\u0022 --std=c\u002B\u002B20",
+    "file": "D:/HabeneroHotel/Hotones/src/Scripting/LuaLibraries/Lighting.cpp"
   },
   {
     "directory": "D:/HabeneroHotel/Hotones",

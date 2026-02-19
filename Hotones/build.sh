@@ -15,6 +15,8 @@ libs=(
     "/ucrt64/bin/libraylib.dll"
     "/ucrt64/bin/lua54.dll"
     "/ucrt64/bin/glfw3.dll"
+    "/ucrt64/bin/libassimp-6.dll"
+    "/ucrt64/bin/libminizip-1.dll"
 )
 
 mkdir -p build

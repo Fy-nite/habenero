@@ -26,6 +26,9 @@ public:
     // `hitPos` (position at impact), `hitNormal` (surface normal), and `t` (0..1 param along segment).
     bool SweepSphere(const Vector3 &start, const Vector3 &end, float radius, Vector3 &hitPos, Vector3 &hitNormal, float &t);
 
+    // Apply a custom shader to all materials in this model (e.g. lit shader).
+    void SetShader(Shader shader);
+
     // Debug drawing: draw per-mesh AABBs and last sweep info
     void DrawDebug() const;
     // Draw per-mesh AABBs/wires using the specified color (keeps visual mapping identical to DrawDebug)

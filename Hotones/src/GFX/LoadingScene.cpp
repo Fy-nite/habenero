@@ -3,8 +3,8 @@
 
 namespace Hotones {
 
-LoadingScene::LoadingScene(float durationSeconds)
-    : bgColor(ColorLerp(DARKBLUE, BLACK, 0.69f)), speed(10.0f/9.0f), drawLines(true), elapsed(0.0f), duration(durationSeconds)
+LoadingScene::LoadingScene(float durationSeconds, std::function<float()> progressCb, std::function<std::string()> errorCb)
+    : bgColor(ColorLerp(DARKBLUE, BLACK, 0.69f)), speed(10.0f/9.0f), drawLines(true), elapsed(0.0f), duration(durationSeconds), m_progressCb(progressCb), m_errorCb(errorCb)
 {
 }
 
@@ -85,14 +85,29 @@ void LoadingScene::Draw()
         }
     }
 
-    DrawText(TextFormat("[MOUSE WHEEL] Current Speed: %.0f", 9.0f*speed/2.0f), 10, 40, 20, RAYWHITE);
-    DrawText(TextFormat("[SPACE] Current draw mode: %s", drawLines ? "Lines" : "Circles"), 10, 70, 20, RAYWHITE);
+    DrawText("Loading Game, please wait.", 10, 40, 20, RAYWHITE);
+    // DrawText("", 10, 70, 20, RAYWHITE);
     DrawFPS(10, 10);
 
-    // Draw a simple progress indicator
-    float t = elapsed / duration;
+    // Draw a simple progress indicator — prefer external progressCb if set
+    float t = 0.0f;
+    if (m_progressCb) {
+        t = m_progressCb();
+    } else {
+        t = elapsed / duration;
+    }
+    if (t < 0.0f) t = 0.0f; if (t > 1.0f) t = 1.0f;
     DrawRectangle(10, GetScreenHeight() - 30, (int)((GetScreenWidth()-20)*t), 16, GREEN);
     DrawRectangleLines(10, GetScreenHeight() - 30, GetScreenWidth()-20, 16, WHITE);
+
+    // If an error callback is provided and returns non-empty, show it here
+    if (m_errorCb) {
+        std::string err = m_errorCb();
+        if (!err.empty()) {
+            DrawTextEx(GetFontDefault(), "Error:", {10, 70}, 18, 0, RED);
+            DrawText(err.c_str(), 10, 90, 16, RAYWHITE);
+        }
+    }
 }
 
 void LoadingScene::Unload()

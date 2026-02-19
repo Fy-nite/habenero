@@ -43,12 +43,15 @@ void MainMenuScene::Init() {
     if (m_net) {
         m_net->OnServerInfo = [this](const std::string& host, uint16_t port,
                                      uint8_t players, uint8_t maxPlayers,
-                                     const char* pakName) {
+                                     const char* pakName, const char* gameVersion,
+                                     const char* pakVersion) {
             for (auto& s : m_servers) {
                 if (s.host == host && s.port == port) {
                     s.playerCount = players;
                     s.maxPlayers  = maxPlayers;
                     std::memcpy(s.pakName, pakName, 32);
+                    std::memcpy(s.gameVersion, gameVersion, 16);
+                    std::memcpy(s.pakVersion, pakVersion, 16);
                     s.responded   = true;
                     s.pinging     = false;
                     return;
@@ -266,13 +269,24 @@ void MainMenuScene::DrawServerBrowser() {
         if (Button("CONNECT", {panel.x + pw - 128, by, 120, bh},
                    {80, 40, 120, 255}, WHITE)) {
             const auto& sv  = m_servers[m_selectedServer];
-            m_serverPakName = sv.pakName;
-            m_selectedPakPath.clear();
-            MatchLocalPak(sv.pakName);
-            m_port = sv.port;
-            m_ipField.setText(sv.host.c_str());
-            m_action = Action::Join;
-            MarkFinished();
+            // Game version check
+            if (sv.gameVersion[0] != '\0' &&
+                strncmp(sv.gameVersion, Net::GAME_VERSION, sizeof(sv.gameVersion)) != 0) {
+                m_statusMessage = "Error: server game version mismatch.";
+                m_statusTimer = 3.0f;
+            } else if (sv.pakName[0] != '\0' && !MatchLocalPak(sv.pakName)) {
+                // Pak advertised but missing locally
+                m_statusMessage = "Error: required pack not installed.";
+                m_statusTimer = 3.0f;
+            } else {
+                m_serverPakName = sv.pakName;
+                m_selectedPakPath.clear();
+                MatchLocalPak(sv.pakName);
+                m_port = sv.port;
+                m_ipField.setText(sv.host.c_str());
+                m_action = Action::Join;
+                MarkFinished();
+            }
         }
     }
 
@@ -304,6 +318,11 @@ void MainMenuScene::DrawServerBrowser() {
             !CheckCollisionPointRec(GetMousePosition(),
                                     {panel.x + 244, by, bw, bh}))
             m_showAddServer = false;
+    }
+
+    // Status message (temporary)
+    if (!m_statusMessage.empty()) {
+        DrawText(m_statusMessage.c_str(), (int)(panel.x + 8), (int)(panel.y + ph - 60), 16, ACCENT);
     }
 }
 

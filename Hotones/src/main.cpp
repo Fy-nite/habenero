@@ -22,6 +22,7 @@
 #include <thread>
 #include <atomic>
 #include <mutex>
+#include <fstream>
 #if defined(_WIN32)
 #include <crtdbg.h>
 #endif
@@ -65,6 +66,10 @@ int main(int argc, char** argv)
     TraceLog(LOG_DEBUG, "CLI args: isServer=%d serverPort=%d connectHost=%s connectPort=%d playerName=%s pak=%s",
              isServer ? 1 : 0, (int)serverPort, connectHost.c_str(), (int)connectPort, playerName.c_str(), pakPath.c_str());
     SetTraceLogLevel(LOG_WARNING); // Reduce raylib log spam (can be set to LOG_INFO for more details)
+
+    // Temporary startup tracing to a file to diagnose early exit/crash locations
+    std::ofstream __startup_log("hotones_startup.log", std::ios::app);
+    if (__startup_log) __startup_log << "args parsed\n";
     // ── Headless server mode (no window needed) ─────────────────────────────
     if (isServer) {
         Hotones::RunHeadlessServer(serverPort, pakPath);
@@ -75,8 +80,9 @@ int main(int argc, char** argv)
     const int screenWidth = 1280;
     const int screenHeight = 768;
 
-    InitWindow(screenWidth, screenHeight, "Habanero Hotel - Hotones");
+    InitWindow(screenWidth, screenHeight, "Habanero");
     TraceLog(LOG_INFO, "Window initialized %dx%d", screenWidth, screenHeight);
+    if (__startup_log) __startup_log << "after InitWindow\n";
 
     // Enable CRT debug heap checks on Windows to catch heap corruption early
 #if defined(_WIN32) && defined(_DEBUG)
@@ -90,6 +96,7 @@ int main(int argc, char** argv)
     // Initialize audio subsystem so game systems can play sounds (footsteps etc.)
     bool audioOk = Ho_tones::InitAudioSystem();
     TraceLog(audioOk ? LOG_INFO : LOG_WARNING, "Audio system %s", audioOk ? "initialized" : "failed to initialize");
+    if (__startup_log) __startup_log << "audioOk=" << (audioOk ? "1" : "0") << "\n";
 
     TraceLog(LOG_INFO, "Initializing physics subsystem");
     Hotones::Physics::InitPhysics();
@@ -155,25 +162,42 @@ int main(int argc, char** argv)
 
         Hotones::Scripting::CupPackage* pakPtr    = g_pak.get();
         std::string                      pathCopy  = path;
-        TraceLog(LOG_INFO, "Starting background pack extraction: %s", pathCopy.c_str());
-        g_packThread = std::thread([pakPtr, pathCopy,
-                                    &g_pakExtracted, &g_packFailed,
-                                    &g_packErrMutex, &g_packError]() {
-            if (!pakPtr->open(pathCopy)) {
-                std::lock_guard<std::mutex> lk(g_packErrMutex);
-                g_packError = "Failed to open pack: " + pathCopy;
-                g_packFailed.store(true);
-                return;
-            }
+        TraceLog(LOG_INFO, "Opening pack (synchronous): %s", pathCopy.c_str());
+        // Synchronous open to avoid threading/allocation issues during startup.
+        if (!pakPtr->open(pathCopy)) {
+            std::lock_guard<std::mutex> lk(g_packErrMutex);
+            g_packError = "Failed to open pack: " + pathCopy;
+            g_packFailed.store(true);
+        } else {
             g_pakExtracted.store(true);
             TraceLog(LOG_INFO, "Pack extracted: %s", pathCopy.c_str());
-        });
+        }
     };
 
     // Scene manager + scenes
     Hotones::SceneManager sceneMgr;
     sceneMgr.Add("menu",    [&netMgr](){ return std::make_unique<Hotones::MainMenuScene>(&netMgr); });
-    sceneMgr.Add("loading", [](){ return std::make_unique<Hotones::LoadingScene>(); });
+    // Loading scene receives callbacks to display pack extraction / init progress
+    sceneMgr.Add("loading", [&g_pakExtracted, &g_packLoaded, &g_packFailed, &g_packErrMutex, &g_packError, &g_script]() {
+        auto progressCb = [&g_pakExtracted, &g_packLoaded, &g_packFailed]() -> float {
+            if (g_packFailed.load()) return 0.0f;
+            if (!g_pakExtracted.load()) return 0.05f;
+            if (!g_packLoaded.load()) return 0.6f;
+            return 1.0f;
+        };
+        auto errorCb = [&g_packErrMutex, &g_packError, &g_script]() -> std::string {
+            {
+                std::lock_guard<std::mutex> lk(g_packErrMutex);
+                if (!g_packError.empty()) return g_packError;
+            }
+            if (g_script) {
+                std::string lerr = g_script->GetLastError();
+                if (!lerr.empty()) return lerr;
+            }
+            return std::string();
+        };
+        return std::make_unique<Hotones::LoadingScene>(3.0f, progressCb, errorCb);
+    });
     sceneMgr.Add("game",    [](){ return std::make_unique<Hotones::GameScene>(); });
 
     // When a pack was given on the command line, set it up now and register the
@@ -205,15 +229,27 @@ int main(int argc, char** argv)
     bool showDebugUI = false;
     
     TraceLog(LOG_INFO, "Entering main loop");
+    if (__startup_log) __startup_log << "entering main loop\n";
     // Main game loop
     while (!WindowShouldClose())    // Detect window close button or ESC key
     {
+        if (__startup_log) __startup_log << "main loop iter\n";
         TraceLog(LOG_DEBUG, "Main loop iteration start — frameTime=%.6f scene=%s", GetFrameTime(), sceneMgr.GetCurrentName().c_str());
         // Update
         //----------------------------------------------------------------------------------
         if (IsKeyPressed(KEY_F1)) {
             showDebugUI = !showDebugUI;
             TraceLog(LOG_DEBUG, "F1 pressed — debug UI=%d", showDebugUI ? 1 : 0);
+            // When opening the debug UI ensure the mouse is visible; when
+            // closing restore cursor capture for gameplay scenes.
+            if (showDebugUI) {
+                EnableCursor();
+            } else {
+                // If we're in gameplay or scripted scenes, re-capture the cursor.
+                std::string cur = sceneMgr.GetCurrentName();
+                if (cur == "game" || cur == "scripted") DisableCursor();
+                else EnableCursor();
+            }
         }
 
         // Only tick the standalone player while actually playing
@@ -353,37 +389,140 @@ int main(int argc, char** argv)
             // ImGui debug overlay
             if (showDebugUI) {
                 rlImGuiBegin();
+                ImGui::SetNextWindowSize({520, 340}, ImGuiCond_FirstUseEver);
                 ImGui::Begin("Debug (F1 to toggle)");
-                ImGui::Text("Scene: %s", sceneMgr.GetCurrentName().c_str());
-                // Network status
-                if (netMgr.GetMode() == Hotones::Net::NetworkManager::Mode::Client) {
-                    if (netMgr.IsConnected()) {
-                        ImGui::Text("Net: connected  (ID %d,  remote players: %d)",
-                                    netMgr.GetLocalId(),
-                                    static_cast<int>(netMgr.GetRemotePlayers().size()));
-                    } else {
-                        ImGui::TextColored({1,1,0,1}, "Net: connecting to %s...", connectHost.c_str());
+
+                if (ImGui::BeginTabBar("##debugtabs")) {
+
+                    // ── General ──────────────────────────────────────────────
+                    if (ImGui::BeginTabItem("General")) {
+                        ImGui::Text("Scene: %s", sceneMgr.GetCurrentName().c_str());
+                        ImGui::Text("FPS: %d  (%.2f ms/frame)", GetFPS(), GetFrameTime() * 1000.0f);
+
+                        ImGui::SeparatorText("Quick-switch scene");
+                        if (ImGui::Button("Menu"))    sceneMgr.SwitchTo("menu");
+                        ImGui::SameLine();
+                        if (ImGui::Button("Game"))    sceneMgr.SwitchWithTransition("game", 0.5f);
+                        ImGui::SameLine();
+                        if (ImGui::Button("Loading")) sceneMgr.SwitchTo("loading");
+                        if (g_script) {
+                            ImGui::SameLine();
+                            if (ImGui::Button("Scripted")) sceneMgr.SwitchWithTransition("scripted", 0.5f);
+                        }
+                        ImGui::EndTabItem();
                     }
-                } else {
-                    ImGui::TextDisabled("Net: offline (use --connect <ip>)");
-                }
-                ImGui::Separator();
-                Hotones::Scene *cur = sceneMgr.GetCurrent();
-                if (cur) {
-                    Hotones::GameScene *gs = dynamic_cast<Hotones::GameScene*>(cur);
-                    if (gs) {
-                        // Player info
-                        Hotones::Player *p = gs->GetPlayer();
-                        Vector3 pos = p->body.position;
-                        Vector3 vel = p->body.velocity;
-                        ImGui::Text("Player pos: %.3f, %.3f, %.3f", pos.x, pos.y, pos.z);
-                        ImGui::Text("Player vel: %.3f, %.3f, %.3f", vel.x, vel.y, vel.z);
-                        bool worldDbg = gs->IsWorldDebug();
-                        if (ImGui::Checkbox("World debug (F2)", &worldDbg)) {
-                            gs->SetWorldDebug(worldDbg);
+
+                    // ── Player ───────────────────────────────────────────────
+                    if (ImGui::BeginTabItem("Player")) {
+                        Hotones::Player* p = nullptr;
+                        if (auto* gs = dynamic_cast<Hotones::GameScene*>(sceneMgr.GetCurrent()))
+                            p = gs->GetPlayer();
+                        else if (auto* ss = dynamic_cast<Hotones::ScriptedScene*>(sceneMgr.GetCurrent()))
+                            p = ss->GetPlayer();
+
+                        if (p) {
+                            Vector3 pos = p->body.position;
+                            Vector3 vel = p->body.velocity;
+                            float   spd = Vector3Length(vel);
+
+                            ImGui::SeparatorText("Transform");
+                            ImGui::Text("Pos:   %.3f, %.3f, %.3f", pos.x, pos.y, pos.z);
+                            ImGui::Text("Vel:   %.3f, %.3f, %.3f", vel.x, vel.y, vel.z);
+                            ImGui::Text("Speed: %.3f u/s", spd);
+                            ImGui::Text("Look:  yaw=%.1f  pitch=%.1f", p->lookRotation.x, p->lookRotation.y);
+                            ImGui::Text("Grounded: %s", p->body.isGrounded ? "yes" : "no");
+
+                            ImGui::SeparatorText("Tweaks");
+                            bool bhop = p->IsSourceBhopEnabled();
+                            if (ImGui::Checkbox("Source Bhop", &bhop))
+                                p->SetSourceBhopEnabled(bhop);
+                            ImGui::SetItemTooltip("Allows Source-style bunny-hop acceleration exploit");
+
+                            if (auto* gs = dynamic_cast<Hotones::GameScene*>(sceneMgr.GetCurrent())) {
+                                bool worldDbg = gs->IsWorldDebug();
+                                if (ImGui::Checkbox("World Debug (F2)", &worldDbg))
+                                    gs->SetWorldDebug(worldDbg);
+                            }
+                        } else {
+                            ImGui::TextDisabled("No player in the current scene.");
+                        }
+                        ImGui::EndTabItem();
+                    }
+
+                    // ── Network ──────────────────────────────────────────────
+                    if (ImGui::BeginTabItem("Network")) {
+                        auto mode = netMgr.GetMode();
+                        const char* modeStr =
+                            mode == Hotones::Net::NetworkManager::Mode::Server ? "Server" :
+                            mode == Hotones::Net::NetworkManager::Mode::Client ? "Client" : "None";
+                        ImGui::Text("Mode: %s", modeStr);
+
+                        if (mode == Hotones::Net::NetworkManager::Mode::Client) {
+                            if (netMgr.IsConnected()) {
+                                ImGui::TextColored({0,1,0,1}, "Connected  (local ID %d)", netMgr.GetLocalId());
+                            } else {
+                                ImGui::TextColored({1,1,0,1}, "Connecting to %s:%d ...",
+                                                  connectHost.c_str(), (int)connectPort);
+                            }
+                        } else if (mode == Hotones::Net::NetworkManager::Mode::Server) {
+                            ImGui::TextColored({0,1,0.5f,1}, "Hosting on port %d", (int)serverPort);
+                        } else {
+                            ImGui::TextDisabled("Offline  (launch with --connect <ip> or --server)");
+                        }
+
+                        const auto& remotes = netMgr.GetRemotePlayers();
+                        if (!remotes.empty()) {
+                            ImGui::SeparatorText("Remote Players");
+                            ImGui::BeginChild("##remoteplayers", {0, 120}, ImGuiChildFlags_Borders);
+                            for (const auto& [id, rp] : remotes) {
+                                if (rp.active)
+                                    ImGui::Text("[%2d] %-16s  (%.1f, %.1f, %.1f)",
+                                                (int)id, rp.name, rp.posX, rp.posY, rp.posZ);
+                            }
+                            ImGui::EndChild();
+                        }
+                        ImGui::EndTabItem();
+                    }
+
+                    // ── Audio ────────────────────────────────────────────────
+                    if (ImGui::BeginTabItem("Audio")) {
+                        ImGui::Text("Sample rate: %d Hz   Channels: %d",
+                                    Ho_tones::GetAudioSampleRate(),
+                                    Ho_tones::GetAudioChannels());
+                        ImGui::Text("Audio device ready: %s", IsAudioDeviceReady() ? "yes" : "no");
+
+                        ImGui::Separator();
+                        int vol = Ho_tones::GetSoundBus().GetVolume();
+                        if (ImGui::SliderInt("Master Volume", &vol, 0, 100))
+                            Ho_tones::GetSoundBus().SetVolume(vol);
+                        if (ImGui::Button("Stop All Sounds"))
+                            Ho_tones::GetSoundBus().StopAll();
+                        ImGui::EndTabItem();
+                    }
+
+                    // ── Lua / Pack ───────────────────────────────────────────
+                    if (g_script) {
+                        if (ImGui::BeginTabItem("Lua")) {
+                            const std::string& lerr = g_script->GetLastError();
+                            if (lerr.empty()) {
+                                ImGui::TextColored({0.4f,1,0.4f,1}, "No errors.");
+                            } else {
+                                ImGui::TextColored({1,0.4f,0.4f,1}, "Error:");
+                                ImGui::Separator();
+                                ImGui::BeginChild("##luaerr", {0, 120}, ImGuiChildFlags_Borders);
+                                ImGui::TextWrapped("%s", lerr.c_str());
+                                ImGui::EndChild();
+                                if (ImGui::Button("Copy##luacopy"))  SetClipboardText(lerr.c_str());
+                                ImGui::SameLine();
+                                if (ImGui::Button("Clear##luaclr"))  g_script->ClearLastError();
+                            }
+                            ImGui::EndTabItem();
                         }
                     }
+
+                    ImGui::EndTabBar();
                 }
+
                 ImGui::End();
                 rlImGuiEnd();
             }
@@ -408,7 +547,7 @@ int main(int argc, char** argv)
     TraceLog(LOG_INFO, "Shutting down audio system");
     Ho_tones::ShutdownAudioSystem();
     TraceLog(LOG_INFO, "Audio shutdown complete");
-
+    if (__startup_log) __startup_log << "shutdown\n";
     rlImGuiShutdown();
 
     CloseWindow();        // Close window and OpenGL context

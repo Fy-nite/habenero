@@ -61,6 +61,8 @@ private:
         uint8_t     playerCount = 0;
         uint8_t     maxPlayers  = 0;
         char        pakName[32] = {};
+        char        gameVersion[16] = {};
+        char        pakVersion[16]  = {};
         bool        responded   = false;
         bool        pinging     = false;
     };
@@ -68,6 +70,8 @@ private:
     int         m_serverScroll   = 0;
     int         m_selectedServer = -1;
     std::string m_serverPakName;
+    std::string m_statusMessage;
+    float       m_statusTimer = 0.f;
 
     // Inline "add server" sub-form
     bool         m_showAddServer  = false;

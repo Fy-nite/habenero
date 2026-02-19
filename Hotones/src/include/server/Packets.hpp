@@ -3,6 +3,9 @@
 
 namespace Hotones::Net {
 
+// Current game version string — update when releasing incompatible builds.
+static constexpr char GAME_VERSION[] = "alpha v0.1";
+
 // ─── Packet type IDs ─────────────────────────────────────────────────────────
 enum class PacketType : uint8_t {
     CONNECT       = 0x01, // Client → Server: request to join
@@ -68,6 +71,8 @@ struct ServerInfoRespPacket {
     uint16_t     port;          // bound port (mirrors what was queried)
     char         pakName[32];   // pack display name, empty = no pack loaded
     char         serverName[32];// optional server display name
+    char         gameVersion[16]; // server game version string
+    char         pakVersion[16];  // optional pack version/hash
 };
 
 #pragma pack(pop)

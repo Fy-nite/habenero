@@ -77,7 +77,8 @@ public:
     // Callback invoked from Update() when a PingServer() reply arrives.
     std::function<void(const std::string& host, uint16_t port,
                        uint8_t playerCount, uint8_t maxPlayers,
-                       const char* pakName)> OnServerInfo;
+                       const char* pakName, const char* gameVersion,
+                       const char* pakVersion)> OnServerInfo;
 
 private:
     // All socket/platform types are hidden here; defined only in NetworkManager.cpp

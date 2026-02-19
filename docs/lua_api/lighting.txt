@@ -1,0 +1,184 @@
+====== lighting ======
+
+Runtime lighting control using the engine's built-in Blinn-Phong GLSL shader.
+Supports up to **8 simultaneous dynamic lights** (point, directional, spot).
+The shader is automatically applied to the world model loaded from ''Init.MainScene''.
+
+Call ''lighting.*'' functions from ''Init()'', ''Update()'', or ''draw3D()'' — **not** from ''Draw()'' (2D pass).
+
+===== Constants =====
+
+^ Constant ^ Value ^ Description ^
+| ''lighting.POINT'' | 0 | Point light: radiates in all directions from a position. |
+| ''lighting.DIRECTIONAL'' | 1 | Directional (sun) light: infinite distance, direction only. |
+| ''lighting.SPOT'' | 2 | Spot light: cone-shaped, defined by position + direction + angles. |
+
+===== Functions =====
+
+==== lighting.setAmbient(r, g, b [, intensity]) ====
+
+Set the scene-wide ambient (fill) light colour and strength.
+
+^ Parameter ^ Type ^ Default ^ Description ^
+| ''r, g, b'' | integer | 255, 255, 255 | Ambient colour (0 – 255). |
+| ''intensity'' | number | 0.15 | Scalar multiplier (0 = pitch black, 1 = fully lit by ambient). |
+
+<code lua>
+-- Dark blue ambient
+lighting.setAmbient(20, 30, 60, 0.1)
+</code>
+
+----
+
+==== handle = lighting.add(type, x, y, z, r, g, b [, intensity, range]) ====
+
+Allocate a light slot.  Returns a **handle** (integer 1–8) used by the other
+functions, or **0** if all 8 slots are full.
+
+^ Parameter ^ Type ^ Default ^ Description ^
+| ''type'' | integer | — | ''lighting.POINT'', ''lighting.DIRECTIONAL'', or ''lighting.SPOT''. |
+| ''x, y, z'' | number | — | World-space position (ignored for directional lights). |
+| ''r, g, b'' | integer | — | Light colour (0 – 255). |
+| ''intensity'' | number | 1.0 | Brightness multiplier. |
+| ''range'' | number | 20.0 | Attenuation radius in world units (point/spot only). |
+
+<code lua>
+function MyGame:Init()
+    -- Warm overhead point light
+    self.lamp = lighting.add(lighting.POINT, 0, 4, 0,  255, 220, 160,  1.5, 15)
+    -- Cool directional sun
+    self.sun  = lighting.add(lighting.DIRECTIONAL, 0, 0, 0,  200, 220, 255,  0.8)
+    lighting.setDir(self.sun, -0.3, -1.0, -0.5)
+end
+</code>
+
+----
+
+==== lighting.remove(handle) ====
+
+Free a light slot so it can be reused.
+
+<code lua>
+lighting.remove(self.lamp)
+self.lamp = nil
+</code>
+
+----
+
+==== lighting.setPos(handle, x, y, z) ====
+
+Move a point or spot light to a new world-space position.
+
+<code lua>
+function MyGame:Update()
+    -- Follow the player with a lantern
+    local px, py, pz = player.getPos()
+    lighting.setPos(self.lantern, px, py + 1.2, pz)
+end
+</code>
+
+----
+
+==== lighting.setDir(handle, x, y, z) ====
+
+Set the direction vector for a directional or spot light.
+The vector does not need to be normalised — the shader normalises it.
+
+<code lua>
+lighting.setDir(self.sun, -0.5, -1.0, -0.3)
+</code>
+
+----
+
+==== lighting.setColor(handle, r, g, b) ====
+
+Change the colour of an existing light (0 – 255 per channel).
+
+<code lua>
+-- Flicker red alarm
+lighting.setColor(self.alarm, 255, 20, 20)
+</code>
+
+----
+
+==== lighting.setIntensity(handle, value) ====
+
+Set the brightness multiplier.  Values > 1 are valid for high-intensity lights.
+
+<code lua>
+lighting.setIntensity(self.lamp, 2.5)
+</code>
+
+----
+
+==== lighting.setRange(handle, value) ====
+
+Set the attenuation radius in world units.  Only affects point and spot lights.
+
+<code lua>
+lighting.setRange(self.lamp, 30.0)
+</code>
+
+----
+
+==== lighting.setEnabled(handle, bool) ====
+
+Toggle a light on or off without removing its slot.
+
+<code lua>
+lighting.setEnabled(self.lamp, false)   -- switch off
+lighting.setEnabled(self.lamp, true)    -- switch on again
+</code>
+
+----
+
+==== lighting.setSpotAngles(handle, innerDeg, outerDeg) ====
+
+Set the inner and outer cone half-angles for a spot light, in **degrees**.
+The transition between full brightness (inner) and darkness (outer) is smooth.
+
+^ Parameter ^ Description ^
+| ''innerDeg'' | Half-angle of the fully-lit inner cone. |
+| ''outerDeg'' | Half-angle of the fade-out outer cone (must be ≥ innerDeg). |
+
+<code lua>
+local spot = lighting.add(lighting.SPOT, 0, 5, 0,  255, 255, 200,  2.0, 12)
+lighting.setDir(spot, 0, -1, 0)
+lighting.setSpotAngles(spot, 10, 25)   -- tight focused beam
+</code>
+
+===== Full example =====
+
+<code lua>
+MyScene = {}
+
+function MyScene:Init()
+    -- Dim blue ambient
+    lighting.setAmbient(30, 40, 80, 0.08)
+
+    -- One warm point light above the centre
+    self.overheadLight = lighting.add(lighting.POINT, 0, 6, 0,
+                                      255, 200, 120,  1.8, 18)
+
+    -- Directional sunlight from the upper-left
+    self.sun = lighting.add(lighting.DIRECTIONAL, 0, 0, 0,
+                            220, 230, 255,  0.6)
+    lighting.setDir(self.sun, -0.4, -1.0, -0.3)
+end
+
+function MyScene:Update()
+    -- Pulse the overhead light
+    local t    = GetTime()
+    local wave = 1.0 + 0.3 * math.sin(t * 3.0)
+    lighting.setIntensity(self.overheadLight, wave)
+end
+
+function MyScene:draw3D()
+    -- (world model is drawn automatically by the engine)
+    mesh.sphere(0, 1, 0, 0.4,  16, 16,  255, 220, 80, 255)
+end
+
+function MyScene:Draw()
+    render.drawText("Dynamic lighting demo", 10, 10)
+end
+</code>

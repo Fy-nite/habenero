@@ -1,5 +1,6 @@
 #include <GFX/ScriptedScene.hpp>
 #include <GFX/CollidableModel.hpp>
+#include <GFX/LightingSystem.hpp>
 #include <GFX/Player.hpp>
 #include <Scripting/CupLoader.hpp>
 #include <server/NetworkManager.hpp>
@@ -34,11 +35,17 @@ void ScriptedScene::Init()
     };
     m_player.AttachCamera(&m_camera);
 
+    // Initialise lighting (idempotent; safe if already done).
+    auto& ls = GFX::LightingSystem::Get();
+    if (!ls.IsReady()) ls.Init();
+
     // Load the model the pack declared in Init.MainScene, if any.
     if (m_script && !m_script->mainScenePath().empty()) {
         m_world = std::make_shared<CollidableModel>(
             m_script->mainScenePath(), Vector3{0.f, 0.f, 0.f});
         m_player.AttachWorld(m_world);
+        // Patch every material in the world model to use the lighting shader.
+        if (ls.IsReady()) m_world->SetShader(ls.GetShader());
     }
     // If no world model, the player will fall through.  The fallback ground
     // plane drawn in DrawFallbackGround() is purely visual — pack authors who
@@ -55,6 +62,12 @@ void ScriptedScene::Update()
 void ScriptedScene::Draw()
 {
     ClearBackground(BLACK);
+
+    // Upload light uniforms so the world model's shader has fresh data this frame.
+    {
+        auto& ls = GFX::LightingSystem::Get();
+        if (ls.IsReady()) ls.UploadUniforms(m_camera);
+    }
 
     BeginMode3D(m_camera);
 

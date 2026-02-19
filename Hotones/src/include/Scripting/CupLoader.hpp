@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <atomic>
 
 struct lua_State;
 
@@ -54,8 +55,21 @@ public:
     // Empty string if none was declared or loadPak has not been called.
     const std::string& mainScenePath() const { return m_mainScene; }
 
+    // Reload the previously-loaded package by re-executing its init.lua.
+    // Returns true on success.
+    bool reload();
+
+        // Last Lua error message (empty when none).  Useful for debug UI.
+        const std::string& GetLastError() const { return m_lastLuaError; }
+        void ClearLastError() { m_lastLuaError.clear(); }
+
     // Access the raw Lua state for advanced usage.
     lua_State* state();
+
+    // Request a reload from any context (Lua binding sets this).  The actual
+    // reload() is executed on the next call to update() to avoid closing the
+    // active Lua state while a C function is running inside it.
+    void requestReload();
 
 private:
     // Push instance + method, call with args already on stack, handle errors.
@@ -64,7 +78,11 @@ private:
 
     lua_State*  L;
     std::string m_mainScene;
+    std::string m_initPath;    ///< absolute path to last loaded init.lua
+    std::string m_packageRoot; ///< package root directory
     int         m_classRef;  ///< LUA_REGISTRY key of MainClass table; LUA_NOREF = none
+        std::string m_lastLuaError; ///< Last Lua error message
+    // reload request flag handled in the implementation file
 };
 
 } // namespace Hotones::Scripting

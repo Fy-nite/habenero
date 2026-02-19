@@ -100,6 +100,8 @@ struct NetworkManager::Impl {
         uint8_t     playerCount = 0;
         uint8_t     maxPlayers  = 0;
         char        pakName[32]    = {};
+        char        gameVersion[16] = {};
+        char        pakVersion[16]  = {};
     };
     std::mutex              pingMutex;
     std::vector<PingResult> pingResults;
@@ -242,6 +244,8 @@ struct NetworkManager::Impl {
         resp.port            = boundPort;
         std::memcpy(resp.pakName, hostedPakName, 32);
         // serverName left empty for now
+        std::memcpy(resp.gameVersion, GAME_VERSION, sizeof(resp.gameVersion));
+        // pakVersion left empty unless set elsewhere
         SendRaw(from, &resp, sizeof(resp));
     }
 
@@ -553,7 +557,8 @@ void NetworkManager::Update() {
             std::swap(results, m_impl->pingResults);
         }
         for (const auto& pr : results)
-            OnServerInfo(pr.host, pr.port, pr.playerCount, pr.maxPlayers, pr.pakName);
+            OnServerInfo(pr.host, pr.port, pr.playerCount, pr.maxPlayers,
+                         pr.pakName, pr.gameVersion, pr.pakVersion);
     }
 }
 
@@ -646,6 +651,8 @@ void NetworkManager::PingServer(const std::string& host, uint16_t port) {
                 pr.playerCount = resp.playerCount;
                 pr.maxPlayers  = resp.maxPlayers;
                 std::memcpy(pr.pakName, resp.pakName, 32);
+                std::memcpy(pr.gameVersion, resp.gameVersion, sizeof(pr.gameVersion));
+                std::memcpy(pr.pakVersion,  resp.pakVersion,  sizeof(pr.pakVersion));
                 std::lock_guard<std::mutex> lk(m_impl->pingMutex);
                 m_impl->pingResults.push_back(std::move(pr));
             }
