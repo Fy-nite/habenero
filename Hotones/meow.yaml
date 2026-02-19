@@ -22,16 +22,11 @@ build:
     - -lraylib
     - -llua
     - -lassimp
-
   winArgs:
     - -lws2_32
-
-  
   generateCompileCommands: true
-  # extraArgs:
-  # - ' -Isrc/include -lraylib -llua -lassimp -std=c++17  -static-libgcc -static-libstdc++ -DHOTONES_USE_JOLT -lws2_32'
   jobs: 12
-dependencies: {}
-dependencyCategories: {}
-devDependencies: {}
-scripts: {}
+# dependencies: {}
+# dependencyCategories: {}
+# devDependencies: {}
+# scripts: {}
