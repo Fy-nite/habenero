@@ -1,0 +1,59 @@
+====== Hotones Lua Scripting API ======
+
+This section documents every function and constant exposed to Lua scripts running inside a ''.cup'' package.
+
+Scripts are loaded from ''init.lua'' at the root of the pack directory.  The engine calls four well-known methods on the table referenced by ''Init.MainClass'':
+
+^ Method ^ When called ^
+| ''YourClass:Init()'' | Once, immediately after the pack loads. |
+| ''YourClass:Update()'' | Every tick (~100 Hz headless, once per frame client). |
+| ''YourClass:draw3D()'' | Every frame, **inside** ''BeginMode3D'' / ''EndMode3D''. Use ''mesh.*'' here. |
+| ''YourClass:Draw()'' | Every frame, **outside** 3D mode. Use ''render.*'' here. |
+
+===== Libraries =====
+
+  * [[lua_api:audio|audio]] — Sound loading and playback.
+  * [[lua_api:input|input]] — Keyboard, mouse, and constants.
+  * [[lua_api:mesh|mesh]] — 3-D primitive drawing (call from ''draw3D'').
+  * [[lua_api:render|render]] — 2-D / HUD drawing (call from ''Draw'').
+  * [[lua_api:server|server]] — Logging, time, and headless-server utilities.
+  * [[lua_api:globals|globals]] — Top-level global functions (''GetFrameTime'', ''GetTime'').
+
+===== Minimal Pack Layout =====
+
+<code>
+MyPack/
+    init.lua          ← required entry point
+    models/           ← optional .obj / .gltf world mesh
+    sounds/           ← optional audio files
+    scripts/          ← optional additional Lua modules
+</code>
+
+===== Minimal init.lua Skeleton =====
+
+<code lua>
+MyGame = {}
+
+Init = {
+    MainClass = MyGame,
+    -- MainScene = "models/world.gltf",   -- optional collision mesh
+    Debug     = false,
+}
+
+function MyGame:Init()
+    server.log("Pack loaded!")
+end
+
+function MyGame:Update()
+    local dt = GetFrameTime()
+    -- update game state here
+end
+
+function MyGame:draw3D()
+    mesh.grid(20, 1)
+end
+
+function MyGame:Draw()
+    render.drawText("Hello World", 10, 10, 24, 255, 255, 255, 255)
+end
+</code>

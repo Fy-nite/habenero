@@ -1,0 +1,130 @@
+====== mesh ======
+
+3-D primitive drawing functions.  These **must only be called from ''draw3D()''**, which the engine invokes between ''BeginMode3D'' / ''EndMode3D''.  Calling them outside that context will produce incorrect results.
+
+All colour parameters (''r, g, b, a'') are integers in the range 0 – 255 and are **optional** — each function has sensible defaults noted below.
+
+===== Functions =====
+
+==== mesh.plane(x, y, z, width, depth [, r, g, b, a]) ====
+
+Draw a horizontal flat plane centred at (x, y, z).
+
+^ Parameter ^ Type ^ Default ^ Description ^
+| ''x, y, z'' | number | — | World-space centre position. |
+| ''width'' | number | — | Extent along the X axis. |
+| ''depth'' | number | — | Extent along the Z axis. |
+| ''r, g, b, a'' | integer | 100, 180, 100, 255 | Fill colour. |
+
+<code lua>
+mesh.plane(0, 0, 0, 20, 20, 80, 120, 80, 255)
+</code>
+
+----
+
+==== mesh.box(x, y, z, width, height, depth [, r, g, b, a]) ====
+
+Draw a solid filled cube/box.
+
+^ Parameter ^ Type ^ Default ^ Description ^
+| ''x, y, z'' | number | — | Centre position. |
+| ''width'' | number | — | Size along X. |
+| ''height'' | number | — | Size along Y. |
+| ''depth'' | number | — | Size along Z. |
+| ''r, g, b, a'' | integer | 255, 255, 255, 255 | Fill colour. |
+
+<code lua>
+mesh.box(0, 1, 0, 1, 2, 1, 200, 100, 60, 255)
+</code>
+
+----
+
+==== mesh.boxWires(x, y, z, width, height, depth [, r, g, b, a]) ====
+
+Draw a wireframe box outline (same parameters as ''mesh.box'').
+
+^ Parameter ^ Type ^ Default ^ Description ^
+| ''r, g, b, a'' | integer | 200, 200, 200, 255 | Wire colour. |
+
+<code lua>
+mesh.boxWires(0, 1, 0, 1, 2, 1, 255, 255, 0, 255)
+</code>
+
+----
+
+==== mesh.sphere(x, y, z, radius [, rings, slices, r, g, b, a]) ====
+
+Draw a solid UV sphere.
+
+^ Parameter ^ Type ^ Default ^ Description ^
+| ''x, y, z'' | number | — | Centre position. |
+| ''radius'' | number | — | Sphere radius. |
+| ''rings'' | integer | 16 | Horizontal ring count. |
+| ''slices'' | integer | 16 | Vertical slice count. |
+| ''r, g, b, a'' | integer | 255, 255, 255, 255 | Fill colour. |
+
+<code lua>
+mesh.sphere(0, 3, 0, 0.5, 8, 8, 255, 50, 50, 255)
+</code>
+
+----
+
+==== mesh.cylinder(x, y, z, radiusTop, radiusBottom, height [, slices, r, g, b, a]) ====
+
+Draw a cylinder (or cone if one radius is 0).
+
+^ Parameter ^ Type ^ Default ^ Description ^
+| ''x, y, z'' | number | — | Base centre position. |
+| ''radiusTop'' | number | — | Radius at the top cap. |
+| ''radiusBottom'' | number | — | Radius at the base cap. |
+| ''height'' | number | — | Height along Y. |
+| ''slices'' | integer | 16 | Number of radial segments. |
+| ''r, g, b, a'' | integer | 255, 255, 255, 255 | Fill colour. |
+
+<code lua>
+-- Cone:
+mesh.cylinder(0, 0, 0, 0, 0.5, 2, 12, 100, 200, 255, 255)
+</code>
+
+----
+
+==== mesh.line(x1, y1, z1, x2, y2, z2 [, r, g, b, a]) ====
+
+Draw a single 3-D line segment between two world-space points.
+
+^ Parameter ^ Type ^ Default ^ Description ^
+| ''x1,y1,z1'' | number | — | Start point. |
+| ''x2,y2,z2'' | number | — | End point. |
+| ''r, g, b, a'' | integer | 255, 255, 255, 255 | Line colour. |
+
+<code lua>
+mesh.line(0, 0, 0, 5, 5, 5, 255, 255, 0, 255)
+</code>
+
+----
+
+==== mesh.grid(slices, spacing) ====
+
+Draw a flat reference grid centred at the origin on the XZ plane.
+
+^ Parameter ^ Type ^ Default ^ Description ^
+| ''slices'' | integer | 20 | Number of divisions in each direction. |
+| ''spacing'' | number | 1.0 | Distance between grid lines (world units). |
+
+<code lua>
+mesh.grid(20, 1)
+</code>
+
+----
+
+==== mesh.axes(x, y, z, size) ====
+
+Draw RGB axis marker lines (X=red, Y=green, Z=blue) at a given position.
+
+^ Parameter ^ Type ^ Default ^ Description ^
+| ''x, y, z'' | number | 0, 0, 0 | Origin position. |
+| ''size'' | number | 1.0 | Length of each axis line. |
+
+<code lua>
+mesh.axes(0, 0.01, 0, 2)
+</code>

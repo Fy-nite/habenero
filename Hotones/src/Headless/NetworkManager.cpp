@@ -89,6 +89,21 @@ struct NetworkManager::Impl {
     static constexpr int    MAX_CONNECT_ATTEMPTS  = 15;
     static constexpr int    CONNECT_RETRY_MS      = 500;
 
+    // Server advertisement
+    char     hostedPakName[32]  = {};
+    uint16_t boundPort          = 0;
+
+    // Ping results (written by detached PingServer threads, drained by Update())
+    struct PingResult {
+        std::string host;
+        uint16_t    port        = 0;
+        uint8_t     playerCount = 0;
+        uint8_t     maxPlayers  = 0;
+        char        pakName[32]    = {};
+    };
+    std::mutex              pingMutex;
+    std::vector<PingResult> pingResults;
+
     // ── Socket helpers ────────────────────────────────────────────────────────
     bool InitSocket(uint16_t bindPort) {
         socket = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -124,6 +139,7 @@ struct NetworkManager::Impl {
             CloseSocket();
             return false;
         }
+        boundPort = bindPort;
         // 200 ms recv timeout so RecvLoop can check `running` periodically
 #ifdef _WIN32
         DWORD tv = 200;
@@ -214,6 +230,21 @@ struct NetworkManager::Impl {
     }
 
     // ── Server packet handlers ────────────────────────────────────────────────
+    void Server_HandleServerInfoReq(const sockaddr_in& from) {
+        uint8_t count = 0;
+        for (const auto& s : clients) if (s.active) ++count;
+
+        ServerInfoRespPacket resp{};
+        resp.header.type     = PacketType::SERVER_INFO_RESP;
+        resp.header.playerId = 0;
+        resp.playerCount     = count;
+        resp.maxPlayers      = MAX_PLAYERS;
+        resp.port            = boundPort;
+        std::memcpy(resp.pakName, hostedPakName, 32);
+        // serverName left empty for now
+        SendRaw(from, &resp, sizeof(resp));
+    }
+
     void Server_HandleConnect(const ConnectPacket& pkt, const sockaddr_in& from,
                                NetworkManager& nm) {
         // Re-send ACK if already registered (idempotent connect)
@@ -333,6 +364,9 @@ struct NetworkManager::Impl {
         const auto& hdr = *reinterpret_cast<const PacketHeader*>(rp.data);
         if (mode == NetworkManager::Mode::Server) {
             switch (hdr.type) {
+            case PacketType::SERVER_INFO_REQ:
+                Server_HandleServerInfoReq(rp.from);
+                break;
             case PacketType::CONNECT:
                 if (rp.len >= static_cast<int>(sizeof(ConnectPacket)))
                     Server_HandleConnect(*reinterpret_cast<const ConnectPacket*>(rp.data), rp.from, nm);
@@ -430,8 +464,7 @@ bool NetworkManager::Connect(const std::string& host, uint16_t port,
         std::string portStr = std::to_string(port);
         int err = getaddrinfo(host.c_str(), portStr.c_str(), &hints, &res);
         if (err != 0 || !res) {
-            std::cerr << "[Net] Cannot resolve host '" << host << "': "
-                      << gai_strerror(err) << "\n";
+            std::cerr << "[Net] Cannot resolve host '" << host << "': error " << err << "\n";
             m_impl->CloseSocket();
             return false;
         }
@@ -512,6 +545,16 @@ void NetworkManager::Update() {
         m_impl->DispatchPacket(local.front(), *this);
         local.pop();
     }
+    // Drain ping results from PingServer() detached threads
+    if (OnServerInfo) {
+        std::vector<Impl::PingResult> results;
+        {
+            std::lock_guard<std::mutex> lk(m_impl->pingMutex);
+            std::swap(results, m_impl->pingResults);
+        }
+        for (const auto& pr : results)
+            OnServerInfo(pr.host, pr.port, pr.playerCount, pr.maxPlayers, pr.pakName);
+    }
 }
 
 NetworkManager::Mode NetworkManager::GetMode() const { return m_impl->mode; }
@@ -519,5 +562,95 @@ uint8_t NetworkManager::GetLocalId()             const { return m_impl->localId;
 
 const std::unordered_map<uint8_t, RemotePlayer>&
 NetworkManager::GetRemotePlayers() const { return m_impl->remotePlayers; }
+
+// ── Server-browser helpers ────────────────────────────────────────────────────
+
+void NetworkManager::SetHostedPakName(const char* name) {
+    if (!name) { m_impl->hostedPakName[0] = '\0'; return; }
+    std::strncpy(m_impl->hostedPakName, name, 31);
+    m_impl->hostedPakName[31] = '\0';
+}
+
+void NetworkManager::PingServer(const std::string& host, uint16_t port) {
+    // Fire-and-forget: open a temp UDP socket, send SERVER_INFO_REQ, wait up to
+    // 600 ms for a reply, then push the result into pingResults for Update() to drain.
+    std::thread([this, host, port]() {
+        SocketHandle sock = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        if (sock == INVALID_SOCK_VAL) return;
+
+        addrinfo hints{};
+        hints.ai_family   = AF_INET;
+        hints.ai_socktype = SOCK_DGRAM;
+        hints.ai_protocol = IPPROTO_UDP;
+        addrinfo* res     = nullptr;
+        const std::string portStr = std::to_string(port);
+        if (getaddrinfo(host.c_str(), portStr.c_str(), &hints, &res) != 0 || !res) {
+#ifdef _WIN32
+            closesocket(sock);
+#else
+            close(sock);
+#endif
+            return;
+        }
+        sockaddr_in dest{};
+        std::memcpy(&dest, res->ai_addr, sizeof(sockaddr_in));
+        freeaddrinfo(res);
+
+#ifdef _WIN32
+        DWORD tv = 600;
+        setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO,
+                   reinterpret_cast<const char*>(&tv), sizeof(tv));
+        // Disable ICMP Port Unreachable reset on temp socket too
+        {
+            DWORD dwBytes = 0; BOOL bDisable = FALSE;
+            WSAIoctl(sock, SIO_UDP_CONNRESET, &bDisable, sizeof(bDisable),
+                     nullptr, 0, &dwBytes, nullptr, nullptr);
+        }
+#else
+        timeval tv{ 0, 600000 };
+        setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+#endif
+
+        ServerInfoReqPacket req{};
+        req.header.type     = PacketType::SERVER_INFO_REQ;
+        req.header.playerId = 0;
+#ifdef _WIN32
+        sendto(sock, reinterpret_cast<const char*>(&req), sizeof(req), 0,
+               reinterpret_cast<const sockaddr*>(&dest), sizeof(dest));
+#else
+        sendto(sock, &req, sizeof(req), 0,
+               reinterpret_cast<const sockaddr*>(&dest), sizeof(dest));
+#endif
+
+        uint8_t     buf[512];
+        sockaddr_in from{};
+        SockLen     fromLen = sizeof(from);
+#ifdef _WIN32
+        int n = recvfrom(sock, reinterpret_cast<char*>(buf),
+                         static_cast<int>(sizeof(buf)), 0,
+                         reinterpret_cast<sockaddr*>(&from), &fromLen);
+        closesocket(sock);
+#else
+        int n = static_cast<int>(
+            recvfrom(sock, buf, sizeof(buf), 0,
+                     reinterpret_cast<sockaddr*>(&from), &fromLen));
+        close(sock);
+#endif
+
+        if (n >= static_cast<int>(sizeof(ServerInfoRespPacket))) {
+            const auto& resp = *reinterpret_cast<const ServerInfoRespPacket*>(buf);
+            if (resp.header.type == PacketType::SERVER_INFO_RESP) {
+                Impl::PingResult pr;
+                pr.host        = host;
+                pr.port        = port;
+                pr.playerCount = resp.playerCount;
+                pr.maxPlayers  = resp.maxPlayers;
+                std::memcpy(pr.pakName, resp.pakName, 32);
+                std::lock_guard<std::mutex> lk(m_impl->pingMutex);
+                m_impl->pingResults.push_back(std::move(pr));
+            }
+        }
+    }).detach();
+}
 
 } // namespace Hotones::Net

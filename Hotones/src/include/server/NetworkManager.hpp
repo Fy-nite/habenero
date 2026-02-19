@@ -64,6 +64,21 @@ public:
     std::function<void(uint8_t id, const char* name)> OnPlayerJoined;
     std::function<void(uint8_t id)>                    OnPlayerLeft;
 
+    // ── Server-browser ping API ───────────────────────────────────────────────
+    // Send a fire-and-forget SERVER_INFO_REQ to host:port from a temporary socket.
+    // Result (if server responds within ~600 ms) is delivered via OnServerInfo on
+    // the next Update() call.  Safe to call in Mode::None (before any connection).
+    void PingServer(const std::string& host, uint16_t port);
+
+    // Set the pack name this server will advertise in SERVER_INFO_RESP replies.
+    // Call after loading a pack in server mode.  Empty string = no pack.
+    void SetHostedPakName(const char* name);
+
+    // Callback invoked from Update() when a PingServer() reply arrives.
+    std::function<void(const std::string& host, uint16_t port,
+                       uint8_t playerCount, uint8_t maxPlayers,
+                       const char* pakName)> OnServerInfo;
+
 private:
     // All socket/platform types are hidden here; defined only in NetworkManager.cpp
     struct Impl;

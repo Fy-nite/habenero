@@ -1,0 +1,89 @@
+====== audio ======
+
+Sound loading and playback.  Works on both the client and the headless server (if the audio device is available).
+
+===== Functions =====
+
+==== audio.loadSound(name, path) ====
+
+Load a sound file and register it under a logical name.
+
+^ Parameter ^ Type ^ Description ^
+| ''name'' | string | Logical key used in subsequent play calls. |
+| ''path'' | string | Path to the audio file, relative to the pack root. |
+
+**Returns:** ''boolean'' — ''true'' on success.
+
+<code lua>
+audio.loadSound("hit", "sounds/hit.wav")
+</code>
+
+----
+
+==== audio.play(name [, gain]) ====
+
+Play a previously loaded sound once.
+
+^ Parameter ^ Type ^ Default ^ Description ^
+| ''name'' | string | — | Logical key passed to ''loadSound''. |
+| ''gain'' | number | ''1.0'' | Volume multiplier (0 – 2 typical). |
+
+**Returns:** ''boolean'' — ''true'' if the sound was found and played.
+
+<code lua>
+audio.play("hit")
+audio.play("hit", 0.5)   -- half volume
+</code>
+
+----
+
+==== audio.playRandom(name [, gain]) ====
+
+Play a random variant from a group of sounds that share a base name (e.g. ''footstep1'', ''footstep2'' …).
+
+^ Parameter ^ Type ^ Default ^ Description ^
+| ''name'' | string | — | Base key for the sound group. |
+| ''gain'' | number | ''1.0'' | Volume multiplier. |
+
+**Returns:** ''boolean''
+
+----
+
+==== audio.playSequential(name [, gain]) ====
+
+Play the next variant in a sound group, cycling back to the first after the last.
+
+^ Parameter ^ Type ^ Default ^ Description ^
+| ''name'' | string | — | Base key for the sound group. |
+| ''gain'' | number | ''1.0'' | Volume multiplier. |
+
+**Returns:** ''boolean''
+
+----
+
+==== audio.setVolume(vol) ====
+
+Set the master volume for all sounds played through the bus.
+
+^ Parameter ^ Type ^ Description ^
+| ''vol'' | integer | Volume in the range ''0'' – ''100''. |
+
+<code lua>
+audio.setVolume(75)
+</code>
+
+----
+
+==== audio.getVolume() ====
+
+**Returns:** ''integer'' — Current master volume (0 – 100).
+
+----
+
+==== audio.stopAll() ====
+
+Immediately stop all currently playing sounds.
+
+<code lua>
+audio.stopAll()
+</code>

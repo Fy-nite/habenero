@@ -95,43 +95,16 @@ int main(int argc, char** argv)
     Hotones::Physics::InitPhysics();
     TraceLog(LOG_INFO, "Physics subsystem initialized");
 
-    // ── Cup pack (client mode) ───────────────────────────────────────────────
-    // Open and initialise a .cup / directory pack when --pak is given.
-    // The pack's CupLoader drives the ScriptedScene each frame.
+    // ── Cup pack state variables ─────────────────────────────────────────────
+    // setupPack() (defined below near the scene manager) handles initialisation.
     std::unique_ptr<Hotones::Scripting::CupPackage> g_pak;
     std::unique_ptr<Hotones::Scripting::CupLoader>  g_script;
-    // Async pack loader state
     std::thread              g_packThread;
     std::atomic<bool>        g_packLoaded{false};
     std::atomic<bool>        g_packFailed{false};
     std::atomic<bool>        g_pakExtracted{false};
     std::mutex               g_packErrMutex;
     std::string              g_packError;
-
-    if (!pakPath.empty()) {
-        TraceLog(LOG_INFO, "Pak requested: %s", pakPath.c_str());
-        g_pak    = std::make_unique<Hotones::Scripting::CupPackage>();
-        g_script = std::make_unique<Hotones::Scripting::CupLoader>();
-
-        // Launch background thread to only open/extract the package.
-        // Lua initialisation and script loading must run on the main thread
-        // (Lua and raylib are not thread-safe together), so we only extract
-        // the archive here and let the main loop perform `CupLoader::init()`
-        // and `loadPak()` after extraction completes.
-        Hotones::Scripting::CupPackage* pakPtr = g_pak.get();
-        std::string packPathCopy = pakPath;
-        TraceLog(LOG_INFO, "Starting background pack extraction: %s", packPathCopy.c_str());
-        g_packThread = std::thread([pakPtr, packPathCopy, &g_pakExtracted, &g_packFailed, &g_packErrMutex, &g_packError]() {
-            if (!pakPtr->open(packPathCopy)) {
-                std::lock_guard<std::mutex> lk(g_packErrMutex);
-                g_packError = "Failed to open pack: " + packPathCopy;
-                g_packFailed.store(true);
-                return;
-            }
-            g_pakExtracted.store(true);
-            TraceLog(LOG_INFO, "Pack extracted: %s", packPathCopy.c_str());
-        });
-    }
 
     // Initialize player and camera
     Hotones::Player player;
@@ -149,27 +122,8 @@ int main(int argc, char** argv)
     player.AttachCamera(&camera);
     TraceLog(LOG_DEBUG, "Player and camera initialized; camera pos=(%.2f,%.2f,%.2f)",
              camera.position.x, camera.position.y, camera.position.z);
-    // Scene manager + scenes
-    Hotones::SceneManager sceneMgr;
-    sceneMgr.Add("menu",    [](){ return std::make_unique<Hotones::MainMenuScene>(); });
-    sceneMgr.Add("loading", [](){ return std::make_unique<Hotones::LoadingScene>(); });
-    sceneMgr.Add("game",    [](){ return std::make_unique<Hotones::GameScene>(); });
 
-    // When a pack is loaded, register a ScriptedScene driven by that pack.
-    if (g_script) {
-        Hotones::Scripting::CupLoader* rawScript = g_script.get();
-        sceneMgr.Add("scripted", [rawScript](){
-            return std::make_unique<Hotones::ScriptedScene>(rawScript);
-        });
-        // Start at the loading screen while the pack loads in background.
-        TraceLog(LOG_INFO, "Registered scripted scene; switching to loading screen");
-        sceneMgr.SwitchTo("loading");
-    } else {
-        TraceLog(LOG_INFO, "No pack provided; switching to main menu");
-        sceneMgr.SwitchTo("menu"); // normal boot
-    }
-
-    // ── Network manager ─────────────────────────────────────────────────────
+    // ── Network manager (declared BEFORE scene manager so menu can use it) ──
     Hotones::Net::NetworkManager netMgr;
     if (!connectHost.empty()) {
         netMgr.Connect(connectHost, connectPort, playerName);
@@ -177,6 +131,69 @@ int main(int argc, char** argv)
     // Rate-limit player-update sends to ~20 Hz
     float netSendTimer = 0.f;
     static constexpr float NET_SEND_INTERVAL = 1.f / 20.f;
+
+    // ── setupPack — initialise async pack loading (callable at any point) ───
+    // Can be called either at startup (--pak) or after the menu selects a pack.
+    auto setupPack = [&](const std::string& path) {
+        if (path.empty()) return;
+        // Join any previous pack thread first
+        if (g_packThread.joinable()) {
+            TraceLog(LOG_INFO, "Joining previous pack thread before re-init");
+            g_packThread.join();
+        }
+        g_pak.reset();
+        g_script.reset();
+        g_pakExtracted.store(false);
+        g_packLoaded.store(false);
+        g_packFailed.store(false);
+        {
+            std::lock_guard<std::mutex> lk(g_packErrMutex);
+            g_packError.clear();
+        }
+        g_pak    = std::make_unique<Hotones::Scripting::CupPackage>();
+        g_script = std::make_unique<Hotones::Scripting::CupLoader>();
+
+        Hotones::Scripting::CupPackage* pakPtr    = g_pak.get();
+        std::string                      pathCopy  = path;
+        TraceLog(LOG_INFO, "Starting background pack extraction: %s", pathCopy.c_str());
+        g_packThread = std::thread([pakPtr, pathCopy,
+                                    &g_pakExtracted, &g_packFailed,
+                                    &g_packErrMutex, &g_packError]() {
+            if (!pakPtr->open(pathCopy)) {
+                std::lock_guard<std::mutex> lk(g_packErrMutex);
+                g_packError = "Failed to open pack: " + pathCopy;
+                g_packFailed.store(true);
+                return;
+            }
+            g_pakExtracted.store(true);
+            TraceLog(LOG_INFO, "Pack extracted: %s", pathCopy.c_str());
+        });
+    };
+
+    // Scene manager + scenes
+    Hotones::SceneManager sceneMgr;
+    sceneMgr.Add("menu",    [&netMgr](){ return std::make_unique<Hotones::MainMenuScene>(&netMgr); });
+    sceneMgr.Add("loading", [](){ return std::make_unique<Hotones::LoadingScene>(); });
+    sceneMgr.Add("game",    [](){ return std::make_unique<Hotones::GameScene>(); });
+
+    // When a pack was given on the command line, set it up now and register the
+    // scripted scene.  If the pack comes from the menu, setupPack + scene
+    // registration happen inside the menu→loading transition below.
+    if (!pakPath.empty()) {
+        TraceLog(LOG_INFO, "Pak requested from CLI: %s", pakPath.c_str());
+        setupPack(pakPath);
+    }
+    if (g_script) {
+        Hotones::Scripting::CupLoader* rawScript = g_script.get();
+        sceneMgr.Add("scripted", [rawScript](){
+            return std::make_unique<Hotones::ScriptedScene>(rawScript);
+        });
+        TraceLog(LOG_INFO, "Registered scripted scene; switching to loading screen");
+        sceneMgr.SwitchTo("loading");
+    } else {
+        TraceLog(LOG_INFO, "No pack provided; switching to main menu");
+        sceneMgr.SwitchTo("menu");
+    }
 
     // Cursor starts enabled (menu). GameScene::Init() calls DisableCursor().
 
@@ -213,18 +230,45 @@ int main(int argc, char** argv)
         // Menu finished → start networking then fade to loading screen
         if (sceneMgr.GetCurrentName() == "menu" && sceneMgr.GetCurrent() && sceneMgr.GetCurrent()->IsFinished()) {
             auto* menu = dynamic_cast<Hotones::MainMenuScene*>(sceneMgr.GetCurrent());
-            if (menu) {
+        if (menu) {
                 if (menu->GetAction() == Hotones::MainMenuScene::Action::Quit) {
                     break; // exit game loop cleanly
                 }
                 playerName = menu->GetPlayerName();
+                std::string menuPakPath = menu->GetPakPath();
+
                 if (menu->GetAction() == Hotones::MainMenuScene::Action::Host) {
                     serverPort = menu->GetConnectPort();
+                    // If a pack was selected, load it and advertise it
+                    if (!menuPakPath.empty()) {
+                        pakPath = menuPakPath;
+                        setupPack(pakPath);
+                        if (g_script) {
+                            Hotones::Scripting::CupLoader* rs = g_script.get();
+                            sceneMgr.Add("scripted", [rs](){
+                                return std::make_unique<Hotones::ScriptedScene>(rs);
+                            });
+                        }
+                        // Tell the server what pack it's running so the browser shows it
+                        std::filesystem::path pp(pakPath);
+                        netMgr.SetHostedPakName(pp.stem().string().c_str());
+                    }
                     TraceLog(LOG_INFO, "Starting server on port %d", serverPort);
                     netMgr.StartServer(serverPort);
                 } else if (menu->GetAction() == Hotones::MainMenuScene::Action::Join) {
                     connectHost = menu->GetConnectHost();
                     connectPort = menu->GetConnectPort();
+                    // If the server advertised a pack we have locally, load it
+                    if (!menuPakPath.empty()) {
+                        pakPath = menuPakPath;
+                        setupPack(pakPath);
+                        if (g_script) {
+                            Hotones::Scripting::CupLoader* rs = g_script.get();
+                            sceneMgr.Add("scripted", [rs](){
+                                return std::make_unique<Hotones::ScriptedScene>(rs);
+                            });
+                        }
+                    }
                     TraceLog(LOG_INFO, "Joining server %s:%d as %s", connectHost.c_str(), connectPort, playerName.c_str());
                     netMgr.Connect(connectHost, connectPort, playerName);
                 }
@@ -373,7 +417,6 @@ int main(int argc, char** argv)
     return 0;
 }
 
-    
 //----------------------------------------------------------------------------------
 // Module Functions Definition
 //----------------------------------------------------------------------------------

@@ -16,6 +16,11 @@
   },
   {
     "directory": "D:/HabeneroHotel/Hotones",
+    "command": "g\u002B\u002B -c -g -O0 \u0022D:/HabeneroHotel/Hotones/src/Assets/PackScanner.cpp\u0022 -o \u0022D:/HabeneroHotel/Hotones/obj/Assets_PackScanner.cpp.o\u0022 -lraylib -llua -lassimp -lws2_32 -I\u0022src/include\u0022 --std=c\u002B\u002B20",
+    "file": "D:/HabeneroHotel/Hotones/src/Assets/PackScanner.cpp"
+  },
+  {
+    "directory": "D:/HabeneroHotel/Hotones",
     "command": "g\u002B\u002B -c -g -O0 \u0022D:/HabeneroHotel/Hotones/src/GFX/AssetPath.cpp\u0022 -o \u0022D:/HabeneroHotel/Hotones/obj/GFX_AssetPath.cpp.o\u0022 -lraylib -llua -lassimp -lws2_32 -I\u0022src/include\u0022 --std=c\u002B\u002B20",
     "file": "D:/HabeneroHotel/Hotones/src/GFX/AssetPath.cpp"
   },
@@ -63,6 +68,11 @@
     "directory": "D:/HabeneroHotel/Hotones",
     "command": "g\u002B\u002B -c -g -O0 \u0022D:/HabeneroHotel/Hotones/src/GFX/SimpleScene.cpp\u0022 -o \u0022D:/HabeneroHotel/Hotones/obj/GFX_SimpleScene.cpp.o\u0022 -lraylib -llua -lassimp -lws2_32 -I\u0022src/include\u0022 --std=c\u002B\u002B20",
     "file": "D:/HabeneroHotel/Hotones/src/GFX/SimpleScene.cpp"
+  },
+  {
+    "directory": "D:/HabeneroHotel/Hotones",
+    "command": "g\u002B\u002B -c -g -O0 \u0022D:/HabeneroHotel/Hotones/src/GFX/StbTextField.cpp\u0022 -o \u0022D:/HabeneroHotel/Hotones/obj/GFX_StbTextField.cpp.o\u0022 -lraylib -llua -lassimp -lws2_32 -I\u0022src/include\u0022 --std=c\u002B\u002B20",
+    "file": "D:/HabeneroHotel/Hotones/src/GFX/StbTextField.cpp"
   },
   {
     "directory": "D:/HabeneroHotel/Hotones",

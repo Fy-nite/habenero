@@ -1,0 +1,55 @@
+====== render ======
+
+2-D / HUD drawing functions.  Call these from ''Draw()'', **outside** of ''draw3D()''.
+
+All colour parameters are integers 0 – 255.
+
+===== Functions =====
+
+==== render.drawText(text, x, y [, size, r, g, b, a]) ====
+
+Draw a string to the screen using the engine's default font.
+
+^ Parameter ^ Type ^ Default ^ Description ^
+| ''text'' | string | — | Text to display. |
+| ''x'' | integer | — | Left edge in pixels (screen space). |
+| ''y'' | integer | — | Top edge in pixels. |
+| ''size'' | integer | 20 | Font size in points. |
+| ''r, g, b, a'' | integer | 255, 255, 255, 255 | Text colour. |
+
+<code lua>
+function MyGame:Draw()
+    render.drawText("Score: " .. self.score, 10, 10, 28, 255, 230, 0, 255)
+end
+</code>
+
+----
+
+==== render.clearScreen([r, g, b, a]) ====
+
+Fill the screen with a solid colour.  Usually called at the start of ''Draw()''.
+
+^ Parameter ^ Type ^ Default ^ Description ^
+| ''r, g, b, a'' | integer | 0, 0, 0, 255 | Clear colour. |
+
+<code lua>
+render.clearScreen(20, 20, 30, 255)
+</code>
+
+----
+
+==== render.drawRect(x, y, w, h [, r, g, b, a]) ====
+
+Draw a filled 2-D rectangle.
+
+^ Parameter ^ Type ^ Default ^ Description ^
+| ''x, y'' | integer | — | Top-left corner in pixels. |
+| ''w'' | integer | — | Width in pixels. |
+| ''h'' | integer | — | Height in pixels. |
+| ''r, g, b, a'' | integer | 255, 255, 255, 255 | Fill colour. |
+
+<code lua>
+-- Semi-transparent dark bar
+render.drawRect(0, 0, 400, 40, 0, 0, 0, 160)
+render.drawText("Habanero Hotel", 8, 8, 24)
+</code>

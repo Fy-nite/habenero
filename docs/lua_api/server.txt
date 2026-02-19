@@ -1,0 +1,76 @@
+====== server ======
+
+Utilities for logging, timing, and server-side state.  All functions are available on both the headless server and the windowed client.
+
+===== Functions =====
+
+==== server.log(message) ====
+
+Write a message to the server console / stdout.
+
+^ Parameter ^ Type ^ Description ^
+| ''message'' | string | Text to print. |
+
+<code lua>
+server.log("Round started — players: " .. #self.players)
+</code>
+
+Output format: ''[Script] <message>''
+
+----
+
+==== server.getTime() ====
+
+Return the number of seconds elapsed since the pack was loaded.  Uses a high-resolution monotonic clock — suitable for timing game events.
+
+**Returns:** ''number'' — Elapsed seconds as a float.
+
+<code lua>
+function MyGame:Init()
+    self.startTime = server.getTime()
+end
+
+function MyGame:Update()
+    local elapsed = server.getTime() - self.startTime
+    if elapsed > 60 then
+        server.log("One minute has passed!")
+    end
+end
+</code>
+
+> **Tip:** For per-frame delta time use the global [[lua_api:globals#getframetime|GetFrameTime()]] instead of differencing ''server.getTime()''.
+
+===== Network Events =====
+
+The following methods on ''Init.MainClass'' are called automatically by the networking layer when a player joins or leaves.  Define them if you need to react to connection events.
+
+==== YourClass:onPlayerJoined(id, name) ====
+
+Called when a client successfully connects.
+
+^ Parameter ^ Type ^ Description ^
+| ''id'' | integer | Unique player ID assigned by the server (1 – 254). |
+| ''name'' | string | Player's display name. |
+
+<code lua>
+function MyGame:onPlayerJoined(id, name)
+    self.players[id] = name
+    server.log(name .. " joined (id=" .. id .. ")")
+end
+</code>
+
+----
+
+==== YourClass:onPlayerLeft(id) ====
+
+Called when a client disconnects.
+
+^ Parameter ^ Type ^ Description ^
+| ''id'' | integer | ID of the disconnecting player. |
+
+<code lua>
+function MyGame:onPlayerLeft(id)
+    server.log("Player " .. id .. " (" .. (self.players[id] or "?") .. ") left")
+    self.players[id] = nil
+end
+</code>

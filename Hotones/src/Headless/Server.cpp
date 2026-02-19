@@ -6,6 +6,7 @@
 #include <atomic>
 #include <chrono>
 #include <csignal>
+#include <filesystem>
 #include <iostream>
 #include <thread>
 
@@ -46,6 +47,11 @@ void RunHeadlessServer(uint16_t port, const std::string& pakPath) {
 
     // -- Network --------------------------------------------------------------
     Net::NetworkManager server;
+
+    if (hasPak) {
+        // Advertise the pack's display name in SERVER_INFO_RESP replies
+        server.SetHostedPakName(std::filesystem::path(pakPath).stem().string().c_str());
+    }
 
     if (hasPak) {
         // Forward network player events into the Lua pack

@@ -11,6 +11,9 @@ enum class PacketType : uint8_t {
     PLAYER_UPDATE = 0x10, // Client → Server own state; Server → All clients
     PING          = 0x20,
     PONG          = 0x21,
+    // ── Server-info query (no connection needed) ──────────────────────────
+    SERVER_INFO_REQ  = 0x30, // Anyone → Server: request server info
+    SERVER_INFO_RESP = 0x31, // Server → requester: server info response
 };
 
 // ─── Packet structures (no padding) ──────────────────────────────────────────
@@ -48,6 +51,23 @@ struct PlayerUpdatePacket {
 struct PingPacket {
     PacketHeader header;
     uint32_t     seq;
+};
+
+// ── Server-info query (fire-and-forget, no prior connection required) ─────────
+
+// Anyone → Server: just the header, no extra payload
+struct ServerInfoReqPacket {
+    PacketHeader header; // type = SERVER_INFO_REQ, playerId = 0
+};
+
+// Server → requester: advertise current state
+struct ServerInfoRespPacket {
+    PacketHeader header;        // type = SERVER_INFO_RESP, playerId = 0
+    uint8_t      playerCount;   // active connected players
+    uint8_t      maxPlayers;    // maximum allowed
+    uint16_t     port;          // bound port (mirrors what was queried)
+    char         pakName[32];   // pack display name, empty = no pack loaded
+    char         serverName[32];// optional server display name
 };
 
 #pragma pack(pop)

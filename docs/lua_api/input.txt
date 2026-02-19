@@ -1,0 +1,135 @@
+====== input ======
+
+Keyboard and mouse query functions.  All key and button identifiers are exposed as integer constants on the ''input'' table itself.
+
+> **Headless server note:** Keyboard and mouse functions return ''false'' / ''0'' when no window is present; they are safe to call but have no effect.
+
+===== Functions =====
+
+==== input.isKeyDown(key) ====
+
+Returns ''true'' while the key is held.
+
+^ Parameter ^ Type ^ Description ^
+| ''key'' | integer | A ''input.KEY_*'' constant. |
+
+**Returns:** ''boolean''
+
+<code lua>
+if input.isKeyDown(input.KEY_W) then
+    -- move forward
+end
+</code>
+
+----
+
+==== input.isKeyPressed(key) ====
+
+Returns ''true'' on the **first frame** the key is pressed (edge trigger).
+
+^ Parameter ^ Type ^ Description ^
+| ''key'' | integer | A ''input.KEY_*'' constant. |
+
+**Returns:** ''boolean''
+
+----
+
+==== input.isKeyReleased(key) ====
+
+Returns ''true'' on the frame the key is released.
+
+^ Parameter ^ Type ^ Description ^
+| ''key'' | integer | A ''input.KEY_*'' constant. |
+
+**Returns:** ''boolean''
+
+----
+
+==== input.isMouseDown(button) ====
+
+Returns ''true'' while the mouse button is held.
+
+^ Parameter ^ Type ^ Description ^
+| ''button'' | integer | ''input.MOUSE_LEFT'', ''input.MOUSE_RIGHT'', or ''input.MOUSE_MIDDLE''. |
+
+**Returns:** ''boolean''
+
+----
+
+==== input.isMousePressed(button) ====
+
+Returns ''true'' on the first frame the mouse button is pressed.
+
+^ Parameter ^ Type ^ Description ^
+| ''button'' | integer | Mouse button constant. |
+
+**Returns:** ''boolean''
+
+----
+
+==== input.getMousePos() ====
+
+**Returns:** ''number, number'' — Screen X and Y position of the cursor in pixels.
+
+<code lua>
+local mx, my = input.getMousePos()
+</code>
+
+----
+
+==== input.getMouseDelta() ====
+
+**Returns:** ''number, number'' — Mouse movement since the last frame (dx, dy).
+
+<code lua>
+local dx, dy = input.getMouseDelta()
+</code>
+
+----
+
+==== input.getMouseWheel() ====
+
+**Returns:** ''number'' — Mouse wheel scroll amount this frame (positive = up).
+
+===== Key Constants =====
+
+All constants are fields on the ''input'' table.
+
+==== Letter Keys ====
+
+''input.KEY_A'' … ''input.KEY_Z''
+
+==== Digit Keys ====
+
+''input.KEY_0'' … ''input.KEY_9''
+
+==== Function Keys ====
+
+''input.KEY_F1'' … ''input.KEY_F12''
+
+==== Named Keys ====
+
+^ Constant ^ Description ^
+| ''input.KEY_SPACE'' | Space bar |
+| ''input.KEY_ENTER'' | Enter / Return |
+| ''input.KEY_ESCAPE'' | Escape |
+| ''input.KEY_TAB'' | Tab |
+| ''input.KEY_BACKSPACE'' | Backspace |
+| ''input.KEY_DELETE'' | Delete |
+| ''input.KEY_UP'' | Up arrow |
+| ''input.KEY_DOWN'' | Down arrow |
+| ''input.KEY_LEFT'' | Left arrow |
+| ''input.KEY_RIGHT'' | Right arrow |
+| ''input.KEY_LSHIFT'' | Left Shift |
+| ''input.KEY_RSHIFT'' | Right Shift |
+| ''input.KEY_LCTRL'' | Left Control |
+| ''input.KEY_RCTRL'' | Right Control |
+| ''input.KEY_LALT'' | Left Alt |
+| ''input.KEY_RALT'' | Right Alt |
+
+==== Mouse Button Constants ====
+
+^ Constant ^ Description ^
+| ''input.MOUSE_LEFT'' | Left mouse button |
+| ''input.MOUSE_RIGHT'' | Right mouse button |
+| ''input.MOUSE_MIDDLE'' | Middle / scroll-wheel button |

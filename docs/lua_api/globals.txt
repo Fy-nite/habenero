@@ -1,0 +1,42 @@
+====== Global Functions ======
+
+These functions are available as bare globals (no table prefix) in every Lua script, on both the headless server and the windowed client.
+
+===== GetFrameTime() =====
+
+Return the time in seconds between the current tick and the previous one.
+
+**Returns:** ''number'' — Delta time in seconds.
+
+  * **Client:** approximately ''1/60'' (~0.0167 s) at 60 FPS.
+  * **Headless server:** approximately ''0.01'' s (server loop sleeps 10 ms per tick).
+
+Use this to make movement and animations frame-rate independent:
+
+<code lua>
+function MyGame:Update()
+    local dt = GetFrameTime()
+    self.boxRot = (self.boxRot + 90 * dt) % 360   -- 90 degrees/second
+    self.pos.x  = self.pos.x + self.speed * dt
+end
+</code>
+
+> **Note:** Returns ''0.0'' on the very first call because there is no previous frame to measure against.
+
+----
+
+===== GetTime() =====
+
+Return the number of seconds elapsed since the Lua state was initialised (i.e. since the pack loaded).
+
+**Returns:** ''number'' — Elapsed time in seconds.
+
+<code lua>
+function MyGame:Update()
+    local t = GetTime()
+    -- pulse an object once per second
+    self.brightness = math.abs(math.sin(t * math.pi))
+end
+</code>
+
+> ''GetTime()'' and [[lua_api:server#servergettime|server.getTime()]] use the same monotonic clock and will return very similar values.  ''GetTime()'' is the idiomatic choice in game-logic code; ''server.getTime()'' is provided for explicitness in server-side scripts.
