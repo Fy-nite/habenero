@@ -17,6 +17,8 @@
 #include <Scripting/CupLoader.hpp>
 #include <Scripting/CupPackage.hpp>
 #include <Physics/PhysicsSystem.hpp>
+#include <PakRegistry.hpp>
+#include <GFX/BuiltInScene.hpp>
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -83,6 +85,8 @@ int main(int argc, char** argv)
 
     InitWindow(screenWidth, screenHeight, "Habanero");
     TraceLog(LOG_INFO, "Window initialized %dx%d", screenWidth, screenHeight);
+    // Disable raylib's default behavior of closing the window when ESC is pressed.
+    SetExitKey(KEY_NULL);
     if (__startup_log) __startup_log << "after InitWindow\n";
 
     // Enable CRT debug heap checks on Windows to catch heap corruption early
@@ -201,6 +205,10 @@ int main(int argc, char** argv)
     });
     sceneMgr.Add("game",    [](){ return std::make_unique<Hotones::GameScene>(); });
 
+    // Scan ./paks for file-based packs so UI can list them.  Built-in C++ packs
+    // should self-register (static registration in their translation units).
+    Hotones::PakRegistry::Get().ScanPaksDir();
+
     // When a pack was given on the command line, set it up now and register the
     // scripted scene.  If the pack comes from the menu, setupPack + scene
     // registration happen inside the menu→loading transition below.
@@ -311,8 +319,24 @@ int main(int argc, char** argv)
                     TraceLog(LOG_INFO, "Joining server %s:%d as %s", connectHost.c_str(), connectPort, playerName.c_str());
                     netMgr.Connect(connectHost, connectPort, playerName);
                 }
-                TraceLog(LOG_INFO, "Switching to loading scene");
-                sceneMgr.SwitchWithTransition("loading", 1.0f);
+
+                // If the menu chose a built-in pack, switch directly to it.
+                std::string serverPackName = menu->GetServerPakName();
+                bool switchedToBuiltin = false;
+                if (!serverPackName.empty() && Hotones::PakRegistry::Get().IsBuiltIn(serverPackName)) {
+                    auto factory = Hotones::PakRegistry::Get().GetBuiltInFactory(serverPackName);
+                    if (factory) {
+                        sceneMgr.Add("builtpack", factory);
+                        TraceLog(LOG_INFO, "Switching to built-in pack scene: %s", serverPackName.c_str());
+                        sceneMgr.SwitchWithTransition("builtpack", 1.0f);
+                        switchedToBuiltin = true;
+                    }
+                }
+
+                if (!switchedToBuiltin) {
+                    TraceLog(LOG_INFO, "Switching to loading scene");
+                    sceneMgr.SwitchWithTransition("loading", 1.0f);
+                }
             }
         }
 
@@ -386,7 +410,18 @@ int main(int argc, char** argv)
         TraceLog(LOG_TRACE, "BeginDrawing() about to run");
         BeginDrawing();
 
-            // Let scene manager draw current scene (GameScene handles its own 3D camera)
+            // If the current scene exposes a camera, run the 3-D pass first.
+            // Scenes that manage their own BeginMode3D inside Draw() (e.g. GameScene)
+            // return nullptr from GetCamera() and are left untouched here.
+            if (Hotones::Scene* cur = sceneMgr.GetCurrent()) {
+                if (Camera3D* cam = cur->GetCamera()) {
+                    BeginMode3D(*cam);
+                        sceneMgr.Draw3D();
+                    EndMode3D();
+                }
+            }
+
+            // 2-D / HUD pass (also the full-pipeline path for scenes without GetCamera)
             sceneMgr.Draw();
 
             // ImGui debug overlay

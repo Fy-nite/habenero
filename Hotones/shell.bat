@@ -1,1 +1,1 @@
-C:/msys64/msys2_shell.cmd -defterm -no-start -ucrt64 
+C:\msys64\msys2_shell.cmd -defterm -no-start -ucrt64 -here -c "./build.sh"

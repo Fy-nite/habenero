@@ -6,6 +6,11 @@
   },
   {
     "directory": "D:/HabeneroHotel/Hotones",
+    "command": "g\u002B\u002B -c -g -O0 \u0022D:/HabeneroHotel/Hotones/src/PakRegistry.cpp\u0022 -o \u0022D:/HabeneroHotel/Hotones/obj/PakRegistry.cpp.o\u0022 -lraylib -llua -lassimp -lws2_32 -I\u0022src/include\u0022 --std=c\u002B\u002B20",
+    "file": "D:/HabeneroHotel/Hotones/src/PakRegistry.cpp"
+  },
+  {
+    "directory": "D:/HabeneroHotel/Hotones",
     "command": "g\u002B\u002B -c -g -O0 \u0022D:/HabeneroHotel/Hotones/src/Player.cpp\u0022 -o \u0022D:/HabeneroHotel/Hotones/obj/Player.cpp.o\u0022 -lraylib -llua -lassimp -lws2_32 -I\u0022src/include\u0022 --std=c\u002B\u002B20",
     "file": "D:/HabeneroHotel/Hotones/src/Player.cpp"
   },
@@ -28,6 +33,11 @@
     "directory": "D:/HabeneroHotel/Hotones",
     "command": "g\u002B\u002B -c -g -O0 \u0022D:/HabeneroHotel/Hotones/src/GFX/bsp.cpp\u0022 -o \u0022D:/HabeneroHotel/Hotones/obj/GFX_bsp.cpp.o\u0022 -lraylib -llua -lassimp -lws2_32 -I\u0022src/include\u0022 --std=c\u002B\u002B20",
     "file": "D:/HabeneroHotel/Hotones/src/GFX/bsp.cpp"
+  },
+  {
+    "directory": "D:/HabeneroHotel/Hotones",
+    "command": "g\u002B\u002B -c -g -O0 \u0022D:/HabeneroHotel/Hotones/src/GFX/BuiltInScene.cpp\u0022 -o \u0022D:/HabeneroHotel/Hotones/obj/GFX_BuiltInScene.cpp.o\u0022 -lraylib -llua -lassimp -lws2_32 -I\u0022src/include\u0022 --std=c\u002B\u002B20",
+    "file": "D:/HabeneroHotel/Hotones/src/GFX/BuiltInScene.cpp"
   },
   {
     "directory": "D:/HabeneroHotel/Hotones",
@@ -83,6 +93,11 @@
     "directory": "D:/HabeneroHotel/Hotones",
     "command": "g\u002B\u002B -c -g -O0 \u0022D:/HabeneroHotel/Hotones/src/GFX/TransitionScene.cpp\u0022 -o \u0022D:/HabeneroHotel/Hotones/obj/GFX_TransitionScene.cpp.o\u0022 -lraylib -llua -lassimp -lws2_32 -I\u0022src/include\u0022 --std=c\u002B\u002B20",
     "file": "D:/HabeneroHotel/Hotones/src/GFX/TransitionScene.cpp"
+  },
+  {
+    "directory": "D:/HabeneroHotel/Hotones",
+    "command": "g\u002B\u002B -c -g -O0 \u0022D:/HabeneroHotel/Hotones/src/GFX/UIManager.cpp\u0022 -o \u0022D:/HabeneroHotel/Hotones/obj/GFX_UIManager.cpp.o\u0022 -lraylib -llua -lassimp -lws2_32 -I\u0022src/include\u0022 --std=c\u002B\u002B20",
+    "file": "D:/HabeneroHotel/Hotones/src/GFX/UIManager.cpp"
   },
   {
     "directory": "D:/HabeneroHotel/Hotones",
@@ -221,22 +236,22 @@
   },
   {
     "directory": "D:/HabeneroHotel/Hotones",
-    "command": "g\u002B\u002B -c -g -O0 \u0022D:/HabeneroHotel/Hotones/src/GFX/BuiltInGamePacks/GameScenes/Ho_Tones/CharacterCustomizer.cpp\u0022 -o \u0022D:/HabeneroHotel/Hotones/obj/GFX_BuiltInGamePacks_GameScenes_Ho_Tones_CharacterCustomizer.cpp.o\u0022 -lraylib -llua -lassimp -lws2_32 -I\u0022src/include\u0022 --std=c\u002B\u002B20",
-    "file": "D:/HabeneroHotel/Hotones/src/GFX/BuiltInGamePacks/GameScenes/Ho_Tones/CharacterCustomizer.cpp"
+    "command": "g\u002B\u002B -c -g -O0 \u0022D:/HabeneroHotel/Hotones/src/GFX/BuiltInGamePacks/GameScenes/OverTone/CharacterCustomizer.cpp\u0022 -o \u0022D:/HabeneroHotel/Hotones/obj/GFX_BuiltInGamePacks_GameScenes_OverTone_CharacterCustomizer.cpp.o\u0022 -lraylib -llua -lassimp -lws2_32 -I\u0022src/include\u0022 --std=c\u002B\u002B20",
+    "file": "D:/HabeneroHotel/Hotones/src/GFX/BuiltInGamePacks/GameScenes/OverTone/CharacterCustomizer.cpp"
   },
   {
     "directory": "D:/HabeneroHotel/Hotones",
-    "command": "g\u002B\u002B -c -g -O0 \u0022D:/HabeneroHotel/Hotones/src/GFX/BuiltInGamePacks/GameScenes/Ho_Tones/Editor.cpp\u0022 -o \u0022D:/HabeneroHotel/Hotones/obj/GFX_BuiltInGamePacks_GameScenes_Ho_Tones_Editor.cpp.o\u0022 -lraylib -llua -lassimp -lws2_32 -I\u0022src/include\u0022 --std=c\u002B\u002B20",
-    "file": "D:/HabeneroHotel/Hotones/src/GFX/BuiltInGamePacks/GameScenes/Ho_Tones/Editor.cpp"
+    "command": "g\u002B\u002B -c -g -O0 \u0022D:/HabeneroHotel/Hotones/src/GFX/BuiltInGamePacks/GameScenes/OverTone/Editor.cpp\u0022 -o \u0022D:/HabeneroHotel/Hotones/obj/GFX_BuiltInGamePacks_GameScenes_OverTone_Editor.cpp.o\u0022 -lraylib -llua -lassimp -lws2_32 -I\u0022src/include\u0022 --std=c\u002B\u002B20",
+    "file": "D:/HabeneroHotel/Hotones/src/GFX/BuiltInGamePacks/GameScenes/OverTone/Editor.cpp"
   },
   {
     "directory": "D:/HabeneroHotel/Hotones",
-    "command": "g\u002B\u002B -c -g -O0 \u0022D:/HabeneroHotel/Hotones/src/GFX/BuiltInGamePacks/GameScenes/Ho_Tones/MainMenu.cpp\u0022 -o \u0022D:/HabeneroHotel/Hotones/obj/GFX_BuiltInGamePacks_GameScenes_Ho_Tones_MainMenu.cpp.o\u0022 -lraylib -llua -lassimp -lws2_32 -I\u0022src/include\u0022 --std=c\u002B\u002B20",
-    "file": "D:/HabeneroHotel/Hotones/src/GFX/BuiltInGamePacks/GameScenes/Ho_Tones/MainMenu.cpp"
+    "command": "g\u002B\u002B -c -g -O0 \u0022D:/HabeneroHotel/Hotones/src/GFX/BuiltInGamePacks/GameScenes/OverTone/MainMenu.cpp\u0022 -o \u0022D:/HabeneroHotel/Hotones/obj/GFX_BuiltInGamePacks_GameScenes_OverTone_MainMenu.cpp.o\u0022 -lraylib -llua -lassimp -lws2_32 -I\u0022src/include\u0022 --std=c\u002B\u002B20",
+    "file": "D:/HabeneroHotel/Hotones/src/GFX/BuiltInGamePacks/GameScenes/OverTone/MainMenu.cpp"
   },
   {
     "directory": "D:/HabeneroHotel/Hotones",
-    "command": "g\u002B\u002B -c -g -O0 \u0022D:/HabeneroHotel/Hotones/src/GFX/BuiltInGamePacks/GameScenes/Ho_Tones/Playing.cpp\u0022 -o \u0022D:/HabeneroHotel/Hotones/obj/GFX_BuiltInGamePacks_GameScenes_Ho_Tones_Playing.cpp.o\u0022 -lraylib -llua -lassimp -lws2_32 -I\u0022src/include\u0022 --std=c\u002B\u002B20",
-    "file": "D:/HabeneroHotel/Hotones/src/GFX/BuiltInGamePacks/GameScenes/Ho_Tones/Playing.cpp"
+    "command": "g\u002B\u002B -c -g -O0 \u0022D:/HabeneroHotel/Hotones/src/GFX/BuiltInGamePacks/GameScenes/OverTone/Playing.cpp\u0022 -o \u0022D:/HabeneroHotel/Hotones/obj/GFX_BuiltInGamePacks_GameScenes_OverTone_Playing.cpp.o\u0022 -lraylib -llua -lassimp -lws2_32 -I\u0022src/include\u0022 --std=c\u002B\u002B20",
+    "file": "D:/HabeneroHotel/Hotones/src/GFX/BuiltInGamePacks/GameScenes/OverTone/Playing.cpp"
   }
 ]

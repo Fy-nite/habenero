@@ -138,7 +138,12 @@ public:
         }
     }
 
-    // Draw top scene
+    // 3-D pass — call INSIDE BeginMode3D / EndMode3D
+    void Draw3D() {
+        if (!stack.empty()) stack.back()->Draw3D();
+    }
+
+    // 2-D / HUD pass — call OUTSIDE 3D mode
     void Draw() {
         if (!stack.empty()) stack.back()->Draw();
     }

@@ -32,7 +32,7 @@ public:
     std::string GetServerPakName() const { return m_serverPakName; }
 
 private:
-    enum class State { Main, ServerBrowser, Host };
+    enum class State { Main, ServerBrowser, Host, BuiltInGames };
 
     // ── State ─────────────────────────────────────────────────────────────────
     State    m_state  = State::Main;
@@ -89,7 +89,8 @@ private:
     void DrawMain();
     void DrawServerBrowser();
     void DrawHost();
-
+    void DrawBuiltInGames();
+    
     void RefreshPacks();
     void PingAllServers();
     void AddServer(const char* host, uint16_t port);

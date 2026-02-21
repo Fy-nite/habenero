@@ -1,23 +1,14 @@
 #include <GFX/MainMenuScene.hpp>
+#include <GFX/UIManager.hpp>
+#include <PakRegistry.hpp>
 #include <raylib.h>
 #include <cstring>
 #include <cstdlib>
 #include <algorithm>
+#include <cctype>
 #include <filesystem>
 
 namespace Hotones {
-
-// ─── Palette ──────────────────────────────────────────────────────────────────
-static constexpr Color BG_DARK     = {  15,  12,  20, 255 };
-static constexpr Color BG_PANEL    = {  25,  22,  35, 230 };
-static constexpr Color BTN_NORMAL  = {  55,  35,  85, 255 };
-static constexpr Color BTN_HOVER   = {  85,  55, 125, 255 };
-static constexpr Color BTN_PRESS   = {  35,  15,  55, 255 };
-static constexpr Color ACCENT      = { 220,  75, 110, 255 };
-static constexpr Color TEXT_DIM    = { 155, 145, 175, 255 };
-static constexpr Color TEXT_BRIGHT = { 220, 210, 235, 255 };
-static constexpr Color SEL_BG      = {  60,  40, 100, 255 };
-static constexpr Color ROW_ALT     = {  22,  19,  32, 255 };
 
 // ─── Constructor ──────────────────────────────────────────────────────────────
 MainMenuScene::MainMenuScene(Net::NetworkManager* net)
@@ -149,26 +140,25 @@ void MainMenuScene::Draw() {
     int sw = GetScreenWidth();
     int sh = GetScreenHeight();
 
-    ClearBackground(BG_DARK);
-    for (int x = 0; x < sw; x += 60) DrawLine(x, 0, x, sh, {28, 24, 40, 255});
-    for (int y = 0; y < sh; y += 60) DrawLine(0, y, sw, y, {28, 24, 40, 255});
-
-    const char* title = "Habenero";
-    int tfs = 64;
-    DrawText(title, (sw - MeasureText(title, tfs)) / 2, 50, tfs, ACCENT);
-    DrawText("alpha v0.1",
-             (sw - MeasureText("alpha v0.1", 16)) / 2, 50 + tfs + 4,
-             16, TEXT_DIM);
+    auto& UI = GFX::UIManager::Get();
+    UI.GridBackground(sw, sh);
+    UI.Title("Habenero", sw);
+    UI.Label("alpha v0.1",
+             (sw - MeasureText("alpha v0.1", 16)) / 2,
+             50 + UI.theme.fontSizeTitle + 4,
+             16, UI.theme.textDim);
 
     switch (m_state) {
     case State::Main:          DrawMain();          break;
     case State::ServerBrowser: DrawServerBrowser(); break;
     case State::Host:          DrawHost();          break;
+    case State::BuiltInGames: DrawBuiltInGames();  break;
     }
 }
 
 // ─── Main sub-screen ──────────────────────────────────────────────────────────
 void MainMenuScene::DrawMain() {
+    auto& UI = GFX::UIManager::Get();
     int sw = GetScreenWidth(), sh = GetScreenHeight();
     float bw = 300, bh = 52;
     float cx = (sw - bw) * 0.5f;
@@ -178,14 +168,57 @@ void MainMenuScene::DrawMain() {
         m_state = State::ServerBrowser;
         PingAllServers();
     }
-    if (Button("HOST GAME",      {cx, cy + 68,  bw, bh})) m_state = State::Host;
-    if (Button("QUIT",           {cx, cy + 136, bw, bh})) {
+    if (Button("BUILT-IN GAMES", {cx, cy + 68, bw, bh})) m_state = State::BuiltInGames;
+    if (Button("HOST GAME",      {cx, cy + 136, bw, bh})) m_state = State::Host;
+    if (Button("QUIT",           {cx, cy + 204, bw, bh})) {
         m_action = Action::Quit;
         MarkFinished();
     }
 
     const char* hint = "Tip: place .cup packs in ./paks/   |   --server flag for headless mode";
-    DrawText(hint, (sw - MeasureText(hint, 14)) / 2, sh - 28, 14, TEXT_DIM);
+    DrawText(hint, (sw - MeasureText(hint, 14)) / 2, sh - 28, 14, UI.theme.textDim);
+}
+
+/// ─── Built-in games sub-screen ───────────────────────────────────────────────
+void MainMenuScene::DrawBuiltInGames() {
+    int sw = GetScreenWidth(), sh = GetScreenHeight();
+    float bw = 300, bh = 52;
+    float cx = (sw - bw) * 0.5f;
+    float cy = (float)sh * 0.5f - 40.f;
+    // draw a list of built-in packs here
+    {
+        // Query PakRegistry for registered built-ins and file-based packs
+        auto& reg = Hotones::PakRegistry::Get();
+        auto names = reg.GetBuiltInNames();
+        float y = cy;
+        for (const auto& n : names) {
+            std::string display = n;
+            if (!display.empty()) display[0] = (char)std::toupper(display[0]);
+            if (Button(display.c_str(), {cx, y, bw, bh})) {
+                m_serverPakName = n;
+                m_selectedPakPath.clear();
+                m_action = Action::Host;
+                MarkFinished();
+            }
+            y += bh + 8;
+        }
+
+        // Also list file-based packs discovered in ./paks
+        auto files = reg.GetFilePaks();
+        for (const auto& kv : files) {
+            std::string disp = kv.first;
+            if (!disp.empty()) disp[0] = (char)std::toupper(disp[0]);
+            if (Button(disp.c_str(), {cx, y, bw, bh})) {
+                // select the file pack path directly
+                m_selectedPakPath = kv.second;
+                m_serverPakName.clear();
+                m_action = Action::Host;
+                MarkFinished();
+            }
+            y += bh + 8;
+        }
+    }
+
 }
 
 // ─── Server Browser sub-screen ────────────────────────────────────────────────
@@ -193,8 +226,8 @@ void MainMenuScene::DrawServerBrowser() {
     int sw = GetScreenWidth(), sh = GetScreenHeight();
     float pw = 700, ph = 440;
     Rectangle panel = {(sw - pw) * 0.5f, (sh - ph) * 0.5f + 20.f, pw, ph};
-    DrawRectangleRec(panel, BG_PANEL);
-    DrawRectangleLinesEx(panel, 2.f, ACCENT);
+    auto& UI = GFX::UIManager::Get();
+    UI.Panel(panel);
 
     DrawText("SERVER BROWSER", (int)(panel.x + 16), (int)(panel.y + 12), 22, WHITE);
 
@@ -213,7 +246,7 @@ void MainMenuScene::DrawServerBrowser() {
         const auto& s   = m_servers[i];
         bool        sel = (i == m_selectedServer);
         Rectangle rr = {panel.x + 4, (float)rowY, pw - 8, (float)(ROW_H - 2)};
-        DrawRectangleRec(rr, sel ? SEL_BG : (i % 2 == 0 ? ROW_ALT : BG_PANEL));
+        DrawRectangleRec(rr, sel ? UI.theme.selBg : (i % 2 == 0 ? UI.theme.rowAlt : UI.theme.bgPanel));
 
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) &&
             CheckCollisionPointRec(GetMousePosition(), rr))
@@ -221,27 +254,27 @@ void MainMenuScene::DrawServerBrowser() {
 
         char addr[80];
         snprintf(addr, sizeof(addr), "%s : %d", s.host.c_str(), (int)s.port);
-        DrawText(addr, (int)(panel.x + 10), rowY + 8, 15, sel ? WHITE : TEXT_BRIGHT);
+        DrawText(addr, (int)(panel.x + 10), rowY + 8, 15, sel ? WHITE : UI.theme.textBright);
 
         if (s.pinging && !s.responded) {
-            DrawText("...", (int)(panel.x + 300), rowY + 8, 15, TEXT_DIM);
+            DrawText("...", (int)(panel.x + 300), rowY + 8, 15, UI.theme.textDim);
         } else if (s.responded) {
             char pl[16];
             snprintf(pl, sizeof(pl), "%d / %d", s.playerCount, s.maxPlayers);
             DrawText(pl, (int)(panel.x + 300), rowY + 8, 15,
-                     sel ? WHITE : TEXT_BRIGHT);
+                     sel ? WHITE : UI.theme.textBright);
             DrawText(s.pakName[0] ? s.pakName : "\xe2\x80\x94",
-                     (int)(panel.x + 400), rowY + 8, 15, ACCENT);
+                     (int)(panel.x + 400), rowY + 8, 15, UI.theme.accent);
         } else {
-            DrawText("?", (int)(panel.x + 300), rowY + 8, 15, TEXT_DIM);
+            DrawText("?", (int)(panel.x + 300), rowY + 8, 15, UI.theme.textDim);
         }
         rowY += ROW_H;
     }
 
     if (m_serverScroll > 0)
-        DrawText("^", (int)(panel.x + pw - 18), (int)(panel.y + 50), 14, TEXT_DIM);
+        DrawText("^", (int)(panel.x + pw - 18), (int)(panel.y + 50), 14, UI.theme.textDim);
     if ((int)m_servers.size() > m_serverScroll + MAX_VIS)
-        DrawText("v", (int)(panel.x + pw - 18), (int)(panel.y + ph - 110), 14, TEXT_DIM);
+        DrawText("v", (int)(panel.x + pw - 18), (int)(panel.y + ph - 110), 14, UI.theme.textDim);
 
     float wheel = GetMouseWheelMove();
     if (wheel != 0.f && CheckCollisionPointRec(GetMousePosition(), panel)) {
@@ -294,7 +327,7 @@ void MainMenuScene::DrawServerBrowser() {
     if (m_showAddServer) {
         Rectangle ap = {panel.x + 8, by - 58, pw - 16, 52};
         DrawRectangleRec(ap, {30, 20, 50, 240});
-        DrawRectangleLinesEx(ap, 1.f, ACCENT);
+        DrawRectangleLinesEx(ap, 1.f, UI.theme.accent);
 
         Rectangle ipR  = {ap.x + 8,   ap.y + 8, 260, 36};
         Rectangle prR  = {ap.x + 276, ap.y + 8,  90, 36};
@@ -322,7 +355,7 @@ void MainMenuScene::DrawServerBrowser() {
 
     // Status message (temporary)
     if (!m_statusMessage.empty()) {
-        DrawText(m_statusMessage.c_str(), (int)(panel.x + 8), (int)(panel.y + ph - 60), 16, ACCENT);
+        DrawText(m_statusMessage.c_str(), (int)(panel.x + 8), (int)(panel.y + ph - 60), 16, UI.theme.accent);
     }
 }
 
@@ -331,8 +364,8 @@ void MainMenuScene::DrawHost() {
     int sw = GetScreenWidth(), sh = GetScreenHeight();
     float pw = 540, ph = 470;
     Rectangle panel = {(sw - pw) * 0.5f, (sh - ph) * 0.5f + 20.f, pw, ph};
-    DrawRectangleRec(panel, BG_PANEL);
-    DrawRectangleLinesEx(panel, 2.f, ACCENT);
+    auto& UI = GFX::UIManager::Get();
+    UI.Panel(panel);
     DrawText("HOST GAME", (int)(panel.x + 16), (int)(panel.y + 12), 22, WHITE);
 
     float fx = panel.x + 24, fw = pw - 48, fh = 38;
@@ -366,14 +399,14 @@ void MainMenuScene::DrawHost() {
 
     if (m_packs.empty()) {
         DrawText("No packs found  \xe2\x80\x94  place .cup files or pack folders in  ./paks/",
-                 (int)(fx + 8), (int)(fy + listH * 0.5f - 8), 12, TEXT_DIM);
+                 (int)(fx + 8), (int)(fy + listH * 0.5f - 8), 12, UI.theme.textDim);
     } else {
         int rowY = (int)fy;
         for (int i = m_packScroll;
              i < (int)m_packs.size() && i < m_packScroll + PACK_MAX_V; ++i) {
             bool sel = (i == m_selectedPack);
             Rectangle rr = {fx + 2, (float)rowY, fw - 4, (float)(PACK_ROW_H - 2)};
-            DrawRectangleRec(rr, sel ? SEL_BG : (i % 2 == 0 ? ROW_ALT : BG_PANEL));
+            DrawRectangleRec(rr, sel ? UI.theme.selBg : (i % 2 == 0 ? UI.theme.rowAlt : UI.theme.bgPanel));
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) &&
                 CheckCollisionPointRec(GetMousePosition(), rr)) {
                 m_selectedPack    = i;
@@ -383,7 +416,7 @@ void MainMenuScene::DrawHost() {
                                 ? "[zip] " : "[dir] ";
             char buf[96];
             snprintf(buf, sizeof(buf), "%s%s", icon, m_packs[i].displayName.c_str());
-            DrawText(buf, (int)(fx + 8), rowY + 7, 15, sel ? WHITE : TEXT_BRIGHT);
+            DrawText(buf, (int)(fx + 8), rowY + 7, 15, sel ? WHITE : UI.theme.textBright);
             rowY += PACK_ROW_H;
         }
         float wheel = GetMouseWheelMove();
@@ -396,7 +429,7 @@ void MainMenuScene::DrawHost() {
     }
 
     if (Button("[refresh]", {fx + fw - 80, fy + listH + 4, 80, 24},
-               {35, 25, 55, 255}, TEXT_DIM))
+               {35, 25, 55, 255}, UI.theme.textDim))
         RefreshPacks();
 
     float bw = 110, bh = 42;
@@ -415,26 +448,13 @@ void MainMenuScene::DrawHost() {
     }
 }
 
-// ─── Shared helpers ───────────────────────────────────────────────────────────
+// ─── Shared helpers (delegate to UIManager) ──────────────────────────────────
 bool MainMenuScene::Button(const char* text, Rectangle rect, Color bg, Color fg) {
-    Vector2 mp  = GetMousePosition();
-    bool over   = CheckCollisionPointRec(mp, rect);
-    bool press  = over && IsMouseButtonDown(MOUSE_BUTTON_LEFT);
-    bool click  = over && IsMouseButtonReleased(MOUSE_BUTTON_LEFT);
-    Color col   = press ? BTN_PRESS : (over ? BTN_HOVER : bg);
-    Color bord  = over  ? ACCENT    : Color{75, 55, 105, 255};
-    DrawRectangleRec(rect, col);
-    DrawRectangleLinesEx(rect, 2.f, bord);
-    int fs = 18, tw = MeasureText(text, fs);
-    DrawText(text,
-             (int)(rect.x + (rect.width  - tw) * 0.5f),
-             (int)(rect.y + (rect.height - fs) * 0.5f),
-             fs, over ? WHITE : fg);
-    return click;
+    return GFX::UIManager::Get().Button(text, rect, bg, fg);
 }
 
 void MainMenuScene::Label(const char* text, int x, int y, int fs, Color col) {
-    DrawText(text, x, y, fs, col);
+    GFX::UIManager::Get().Label(text, x, y, fs, col);
 }
 
 } // namespace Hotones
