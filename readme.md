@@ -20,7 +20,7 @@ A social game engine built in C++ with Lua scripting, designed for creating mult
 
 ### Prerequisites
 - C++17 compatible compiler (MSVC, GCC, or Clang)
-- CMake (if building from source)
+- Meow (if building from source)
 - [raylib](https://www.raylib.com/) (if not bundled)
 - Lua 5.4 (if not bundled)
 
