@@ -3,7 +3,7 @@
 
 # Habenero
 
-A social game engine built in C++ with Lua scripting, designed for creating multiplayer games with a focus on social interaction and fun. The engine provides a modular architecture, allowing developers to easily create and manage game content through asset packs and Lua scripts.
+A social game engine built in C++ with Lua scripting and ObjectIR Integrations will be coming soon, designed for creating multiplayer games with a focus on social interaction and fun. The engine provides a modular architecture, allowing developers to easily create and manage game content through asset packs and Lua scripts.
 
 
 ## Features
