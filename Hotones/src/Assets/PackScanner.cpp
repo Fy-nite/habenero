@@ -1,37 +1,43 @@
 #include <Assets/PackScanner.hpp>
-#include <filesystem>
 #include <algorithm>
+#include <sys/stat.h>
+#include <dirent.h>
 
 namespace Hotones::Assets {
 
 std::vector<PackEntry> ScanPacksDir(const std::string& basePath) {
     std::vector<PackEntry> out;
-    namespace fs = std::filesystem;
-
-    std::error_code ec;
-    if (!fs::exists(basePath, ec) || !fs::is_directory(basePath, ec))
-        return out;
-
-    for (const auto& e : fs::directory_iterator(basePath, ec)) {
-        if (ec) break;
+    DIR* dir = opendir(basePath.c_str());
+    if (!dir) return out;
+    struct dirent* ent;
+    while ((ent = readdir(dir)) != nullptr) {
+        std::string name(ent->d_name);
+        if (name == "." || name == "..") continue;
+        std::string full = basePath + "/" + name;
+        struct stat st;
+        if (stat(full.c_str(), &st) != 0) continue;
 
         PackEntry pe;
-        pe.fullPath    = e.path().string();
-        pe.displayName = e.path().filename().string();
+        pe.fullPath = full;
+        pe.displayName = name;
 
-        if (e.is_directory(ec)) {
-            if (fs::exists(e.path() / "init.lua", ec)) {
+        if (S_ISDIR(st.st_mode)) {
+            std::string initPath = full + "/init.lua";
+            struct stat ist;
+            if (stat(initPath.c_str(), &ist) == 0 && S_ISREG(ist.st_mode)) {
                 pe.type = PackEntry::Type::Directory;
                 out.push_back(pe);
             }
-        } else if (e.is_regular_file(ec)) {
-            auto ext = e.path().extension().string();
+        } else if (S_ISREG(st.st_mode)) {
+            size_t dot = name.find_last_of('.');
+            std::string ext = (dot == std::string::npos) ? std::string() : name.substr(dot);
             if (ext == ".cup" || ext == ".zip") {
                 pe.type = PackEntry::Type::ZipFile;
                 out.push_back(pe);
             }
         }
     }
+    closedir(dir);
 
     std::sort(out.begin(), out.end(), [](const PackEntry& a, const PackEntry& b) {
         return a.displayName < b.displayName;

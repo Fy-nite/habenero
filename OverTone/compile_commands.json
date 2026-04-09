@@ -1,0 +1,7 @@
+[
+  {
+    "directory": "D:/git/habenero/OverTone",
+    "command": "g\u002B\u002B -c -g -O0 \u0022D:/git/habenero/OverTone/src/lib.cpp\u0022 -o \u0022D:/git/habenero/OverTone/obj/lib.cpp.o\u0022 -lraylib -llua -lassimp -shared -lws2_32 -I\u0022src/include\u0022 -I\u0022src/GFX\u0022 --std=c\u002B\u002B20",
+    "file": "D:/git/habenero/OverTone/src/lib.cpp"
+  }
+]

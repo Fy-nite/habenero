@@ -2,5 +2,6 @@
     "C_Cpp.errorSquiggles": "enabled",
     "Lua.diagnostics.globals": [
         "server"
-    ]
+    ],
+    "cmake.sourceDirectory": "D:/git/habenero/Hotones"
 }

@@ -49,8 +49,19 @@ void RunHeadlessServer(uint16_t port, const std::string& pakPath) {
     Net::NetworkManager server;
 
     if (hasPak) {
-        // Advertise the pack's display name in SERVER_INFO_RESP replies
-        server.SetHostedPakName(std::filesystem::path(pakPath).stem().string().c_str());
+        // Advertise the pack's display name in SERVER_INFO_RESP replies.
+        // Extract the stem from the provided path without using
+        // std::filesystem::path::stem().string() to avoid codecvt linkage.
+        auto extract_stem = [](const std::string& p) -> std::string {
+            size_t end = p.size();
+            while (end > 0 && (p[end-1] == '/' || p[end-1] == '\\')) --end;
+            size_t start = p.find_last_of("/\\", end == 0 ? 0 : end-1);
+            if (start == std::string::npos) start = 0; else ++start;
+            size_t dot = p.find_last_of('.', end == 0 ? 0 : end-1);
+            if (dot == std::string::npos || dot < start) dot = end;
+            return p.substr(start, dot - start);
+        };
+        server.SetHostedPakName(extract_stem(pakPath).c_str());
     }
 
     if (hasPak) {

@@ -23,6 +23,8 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <algorithm>
+#include <cctype>
 #include <atomic>
 #include <mutex>
 #include <fstream>
@@ -297,8 +299,21 @@ int main(int argc, char** argv)
                             });
                         }
                         // Tell the server what pack it's running so the browser shows it
-                        std::filesystem::path pp(pakPath);
-                        netMgr.SetHostedPakName(pp.stem().string().c_str());
+                        // Avoid calling std::filesystem::path::stem().string() which
+                        // can pull in codecvt symbols on some toolchains. Extract
+                        // the stem using simple string manipulation instead.
+                        auto extract_stem = [](const std::string& p) -> std::string {
+                            // Remove trailing slashes
+                            size_t end = p.size();
+                            while (end > 0 && (p[end-1] == '/' || p[end-1] == '\\')) --end;
+                            size_t start = p.find_last_of("/\\", end == 0 ? 0 : end-1);
+                            if (start == std::string::npos) start = 0; else ++start;
+                            size_t dot = p.find_last_of('.', end == 0 ? 0 : end-1);
+                            if (dot == std::string::npos || dot < start) dot = end;
+                            return p.substr(start, dot - start);
+                        };
+                        std::string stem = extract_stem(pakPath);
+                        netMgr.SetHostedPakName(stem.c_str());
                     }
                     TraceLog(LOG_INFO, "Starting server on port %d", serverPort);
                     netMgr.StartServer(serverPort);

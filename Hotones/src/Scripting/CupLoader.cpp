@@ -6,6 +6,7 @@
 #include <raylib.h>
 #include "../include/Scripting/CupLoader.hpp"
 #include "../include/Scripting/CupPackage.hpp"
+#include "../include/Scripting/CppLoader.hpp"
 #include "../include/Scripting/LuaLoader/Rendering.hpp"
 #include "../include/Scripting/LuaLoader/Audio.hpp"
 #include "../include/Scripting/LuaLoader/Input.hpp"
@@ -190,6 +191,30 @@ bool CupLoader::loadPak(CupPackage& pkg)
         return false;
     }
 
+    // If the package provides a native compiled module (game.dll / game.so),
+    // prefer loading that instead of running Lua.  Native modules must
+    // implement the minimal Game API (CreateGame/DestroyGame/UpdateGame/DrawGame).
+    const std::string nativePath = pkg.nativeModulePath();
+    if (!nativePath.empty()) {
+        // load native module
+        try {
+            m_cppLoader.reset(new CppLoader());
+        } catch (...) {
+            TraceLog(LOG_ERROR, "[CupLoader] Failed to allocate CppLoader");
+            return false;
+        }
+        if (!m_cppLoader->loadModule(nativePath)) {
+            TraceLog(LOG_ERROR, "[CupLoader] Failed to load native module: %s", nativePath.c_str());
+            m_lastLuaError = m_cppLoader->GetLastError();
+            m_cppLoader.reset();
+            return false;
+        }
+        m_nativeModule = true;
+        m_packageRoot = pkg.rootPath();
+        TraceLog(LOG_INFO, "[CupLoader] Loaded native module: %s", nativePath.c_str());
+        return true;
+    }
+
     const std::string initPath = pkg.initScript();
     if (!std::filesystem::exists(initPath)) {
         TraceLog(LOG_ERROR, "[CupLoader] Pack is missing init.lua: %s", initPath.c_str());
@@ -343,6 +368,12 @@ bool CupLoader::reload()
 
 void CupLoader::update()
 {
+    if (m_nativeModule && m_cppLoader) {
+        float dt = GetFrameTime();
+        m_cppLoader->update(dt);
+        return;
+    }
+
     // Call the scripted Update() first.  If the script requested a reload
     // via reloadPack(), perform the reload AFTER the call returns to avoid
     // closing the active Lua state while a C function is on the stack.
@@ -353,8 +384,17 @@ void CupLoader::update()
     }
 }
 
-void CupLoader::draw3D()  { callMethod("draw3D");  }
-void CupLoader::draw()    { callMethod("Draw");    }
+void CupLoader::draw3D()
+{
+    if (m_nativeModule && m_cppLoader) { m_cppLoader->draw(); return; }
+    callMethod("draw3D");
+}
+
+void CupLoader::draw()
+{
+    if (m_nativeModule && m_cppLoader) { m_cppLoader->draw(); return; }
+    callMethod("Draw");
+}
 
 void CupLoader::firePlayerJoined(uint8_t id, const char* name)
 {

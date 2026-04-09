@@ -74,6 +74,25 @@ std::string CupPackage::initScript() const
     return (fs::path(m_rootPath) / "init.lua").string();
 }
 
+std::string CupPackage::nativeModulePath() const
+{
+    if (!m_open) return {};
+#ifdef _WIN32
+    const char* exts[] = {".dll"};
+#elif defined(__APPLE__)
+    const char* exts[] = {".dylib", ".so"};
+#else
+    const char* exts[] = {".so"};
+#endif
+
+    fs::path root(m_rootPath);
+    for (const char* ext : exts) {
+        fs::path candidate = root / ("game" + std::string(ext));
+        if (fs::exists(candidate)) return candidate.string();
+    }
+    return {};
+}
+
 void CupPackage::close()
 {
     if (!m_tempDir.empty()) {

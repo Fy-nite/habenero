@@ -25,8 +25,13 @@ CollidableModel::CollidableModel(const std::string& path, Vector3 position)
         fclose(f);
         // If the file appears to be a BSP, attempt to load via the BSP importer
         try {
-            std::filesystem::path p(loadPath);
-            std::string ext = p.extension().string();
+            // Determine extension from the filename without using std::filesystem
+            std::string s(loadPath);
+            size_t slash = s.find_last_of("/\\");
+            size_t start = (slash == std::string::npos) ? 0 : slash + 1;
+            size_t dot = s.find_last_of('.');
+            std::string ext;
+            if (dot != std::string::npos && dot > start) ext = s.substr(dot);
             for (auto &c : ext) c = (char)tolower(c);
             // if (ext == ".bsp") {
             //     auto models = LoadModelsFromBSPFile(p);

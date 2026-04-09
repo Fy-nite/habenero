@@ -1,0 +1,34 @@
+name: game
+version: 0.1.0
+description: Overtone
+authors:
+- charlie-san
+- exxon47
+type: library
+main: src/lib.cpp
+build:
+  mode: debug
+  incremental: true
+  wildcard: true
+  link: true
+  objdir: obj
+  output: build
+  target: debug
+  compiler: cpp
+  std: "c++20"
+  includeDirs:
+    - src/include
+    - src/GFX
+  extraArgs: 
+    - -lraylib
+    - -llua
+    - -lassimp
+  winArgs:
+    - -shared
+    - -lws2_32
+  generateCompileCommands: true
+  jobs: 12
+# dependencies: {}
+# dependencyCategories: {}
+# devDependencies: {}
+# scripts: {}

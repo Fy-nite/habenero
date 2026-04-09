@@ -1,5 +1,6 @@
 #include <PakRegistry.hpp>
-#include <filesystem>
+#include <sys/stat.h>
+#include <dirent.h>
 #include <algorithm>
 #include <cctype>
 
@@ -39,19 +40,33 @@ std::vector<std::string> PakRegistry::GetBuiltInNames() const {
 
 void PakRegistry::ScanPaksDir() {
     m_filePaks.clear();
-    std::filesystem::path p("./paks");
-    if (!std::filesystem::exists(p) || !std::filesystem::is_directory(p)) return;
-    for (auto& e : std::filesystem::directory_iterator(p)) {
-        try {
-            if (e.is_regular_file() && e.path().extension() == ".cup") {
-                std::string name = toLo(e.path().stem().string());
-                m_filePaks[name] = e.path().string();
-            } else if (e.is_directory()) {
-                std::string name = toLo(e.path().stem().string());
-                m_filePaks[name] = e.path().string();
+    const char* dirPath = "./paks";
+    DIR* dir = opendir(dirPath);
+    if (!dir) return;
+    struct dirent* ent;
+    while ((ent = readdir(dir)) != nullptr) {
+        std::string name(ent->d_name);
+        if (name == "." || name == "..") continue;
+        std::string full = std::string(dirPath) + "/" + name;
+        struct stat st;
+        if (stat(full.c_str(), &st) != 0) continue;
+        bool is_dir = S_ISDIR(st.st_mode);
+        bool is_file = S_ISREG(st.st_mode);
+        if (is_file) {
+            // check .cup extension
+            size_t dot = name.find_last_of('.');
+            std::string ext = (dot == std::string::npos) ? std::string() : name.substr(dot);
+            if (ext == ".cup") {
+                size_t dpos = name.find_last_of('.');
+                std::string stem = (dpos == std::string::npos) ? name : name.substr(0, dpos);
+                m_filePaks[toLo(stem)] = full;
             }
-        } catch (...) {}
+        } else if (is_dir) {
+            // directory - use directory name as pak name
+            m_filePaks[toLo(name)] = full;
+        }
     }
+    closedir(dir);
 }
 
 std::string PakRegistry::GetFilePakPath(const std::string& name) const {

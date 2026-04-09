@@ -1,40 +1,17 @@
 
+#!/usr/bin/env bash
 set -euo pipefail
 
-libs=(
-    "/ucrt64/bin/libstdc++-6.dll"
-    "/ucrt64/bin/libassimp-6.dll"
-    "/ucrt64/bin/libgcc_s_seh-1.dll"
-    "/ucrt64/bin/libwinpthread-1.dll"
-    "/ucrt64/bin/libraylib.dll"
-    "/ucrt64/bin/lua54.dll"
-    "/ucrt64/bin/glfw3.dll"
-    "/ucrt64/bin/libassimp-6.dll"
-    "/ucrt64/bin/libminizip-1.dll"
-    "/ucrt64/bin/libbz2-1.dll"
-    "/ucrt64/bin/libzstd.dll"
-)
+# CMake-based build helper (runs in MSYS2 MINGW64 shell)
+BUILD_DIR=build
+mkdir -p ${BUILD_DIR}
 
-mkdir -p build
+echo "Configuring with CMake..."
+# Allow overriding generator via env var; default to Unix Makefiles in MSYS
+GEN="${CMAKE_GENERATOR:-Unix Makefiles}"
+echo "Using CMake generator: ${GEN}"
+cmake -S . -B ${BUILD_DIR} -G "${GEN}" -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON
+echo "Building..."
+cmake --build ${BUILD_DIR} -- -j$(nproc || echo 4)
 
-if [[ "${OS:-}" == "Windows_NT" ]]; then
-    for lib in "${libs[@]}"; do
-        if [[ ! -e "$lib" ]]; then
-            printf 'Required library not found: %s\n' "$lib" >&2
-            exit 1
-        fi
-        printf 'Copying %s to build directory...\n' "$lib"
-        cp -f "$lib" build/
-    done
-fi
-
-
-mkdir -p build/assets
-cp -r -f assets/. build/assets/
-# if meow is not on path, use the local copy and if -- compile wasn't provided, use meow to build the project.
-if ! command -v meow &> /dev/null; then
-    echo "meow could not be found, using local copy"
-    ../../meow/publish/win-x64/meow build
-else
-    meow build
-fi
+echo "Build finished. Output placed in ${BUILD_DIR}/ (executable: ${BUILD_DIR}/habenero.exe)"

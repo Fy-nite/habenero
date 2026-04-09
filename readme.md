@@ -33,7 +33,7 @@ A social game engine built in C++ with Lua scripting and ObjectIR Integrations w
     ```sh
     # on windows, use a ucrt64 shell from MSYS2 or similar
     cd Ho-Tones
-    meow build
+    ./shell.bat # this launches ucrt on your system and builds with compiled libs.
     ```
 3. Run the engine:
 	```sh
