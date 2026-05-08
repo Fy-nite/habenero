@@ -238,7 +238,7 @@ int main(int argc, char** argv)
     rlImGuiSetup(true);
     //--------------------------------------------------------------------------------------
     bool showDebugUI = false;
-    
+
     TraceLog(LOG_INFO, "Entering main loop");
     if (__startup_log) __startup_log << "entering main loop\n";
     // Main game loop

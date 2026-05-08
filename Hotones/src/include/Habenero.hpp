@@ -1,4 +1,5 @@
 #pragma once
+#include "GFX/Player.hpp"
 #include <raylib.h>
 
 // ── Engine convenience API — one include to get everything ───────────────────
@@ -15,6 +16,11 @@ namespace Hotones {
 
 class core {
 public:
+    struct ModuleState {
+		float time = 0.0f;
+		int frames = 0;
+
+	};
   static Camera3D *camera;
   core() {
     camera = new Camera3D();

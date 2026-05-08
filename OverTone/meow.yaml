@@ -2,8 +2,8 @@ name: game
 version: 0.1.0
 description: Overtone
 authors:
-- charlie-san
-- exxon47
+  - charlie-san
+  - exxon47
 type: library
 main: src/lib.cpp
 build:
@@ -17,12 +17,12 @@ build:
   compiler: cpp
   std: "c++20"
   includeDirs:
-    - src/include
-    - src/GFX
-  extraArgs: 
+    - ../Hotones/src/include
+  extraArgs:
     - -lraylib
     - -llua
     - -lassimp
+    - -fPIC
   winArgs:
     - -shared
     - -lws2_32

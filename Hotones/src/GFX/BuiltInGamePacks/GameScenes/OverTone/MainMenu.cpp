@@ -45,7 +45,7 @@ public:
     }
     void Update() override { /* game logic  */ }
     void Draw3D() override { /* mesh draws  */
-    
+
     }
     void Draw()   override {
         ClearBackground(BLACK);

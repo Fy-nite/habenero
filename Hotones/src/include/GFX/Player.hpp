@@ -2,7 +2,7 @@
     #pragma once
     #ifndef PLAYER_HPP
     #define PLAYER_HPP
-    
+
     #include <raylib.h>
 
     #include <raymath.h>
@@ -10,9 +10,9 @@
     #include <memory>
     // Forward-declare the global SoundBus accessor from the audio system
     namespace Ho_tones { class SoundBus; SoundBus& GetSoundBus(); }
-    
+
     namespace Hotones {
-        
+
         class Player {
             public:
             // Movement constants
@@ -64,7 +64,7 @@
     Body body;
     Vector2 lookRotation;
     Vector2 sensitivity;
-    
+
     // Animation/Transition state
     float headTimer;
     float walkLerp;
